@@ -1,0 +1,129 @@
+# =============================================================================
+# Docker Compose — Sistema de Predicción Mundial FIFA 2026
+# =============================================================================
+# Orquesta 4 servicios: SQL Server, MLflow, App principal y Streamlit.
+# Uso: docker-compose up -d
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # SQL Server 2022 — Base de datos principal
+  # ---------------------------------------------------------------------------
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mundial-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${DB_SA_PASSWORD}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - mundial-net
+
+  # ---------------------------------------------------------------------------
+  # MLflow — Servidor de seguimiento de experimentos
+  # ---------------------------------------------------------------------------
+  mlflow:
+    build:
+      context: ./docker/mlflow
+      dockerfile: Dockerfile
+    container_name: mundial-mlflow
+    environment:
+      DB_SA_PASSWORD: ${DB_SA_PASSWORD}
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - mundial-net
+
+  # ---------------------------------------------------------------------------
+  # App — Servicio principal de predicción (pipelines, modelos, scraping)
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: ./docker/app
+      dockerfile: Dockerfile
+    container_name: mundial-app
+    environment:
+      DB_SA_PASSWORD: ${DB_SA_PASSWORD}
+      DB_HOST: sqlserver
+      DB_PORT: 1433
+      DB_NAME: mundial
+      DB_USER: sa
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PYTHONPATH: /app
+      ODDS_API_KEY: ${ODDS_API_KEY}
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - mundial-net
+
+  # ---------------------------------------------------------------------------
+  # Streamlit — Dashboard interactivo de predicciones
+  # ---------------------------------------------------------------------------
+  streamlit:
+    build:
+      context: ./docker/streamlit
+      dockerfile: Dockerfile
+    container_name: mundial-streamlit
+    environment:
+      DB_SA_PASSWORD: ${DB_SA_PASSWORD}
+      DB_HOST: sqlserver
+      DB_PORT: 1433
+      DB_NAME: mundial
+      DB_USER: sa
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PYTHONPATH: /app
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      app:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - mundial-net
+
+# =============================================================================
+# Volúmenes persistentes
+# =============================================================================
+volumes:
+  sqlserver_data:
+    driver: local
+  mlflow_artifacts:
+    driver: local
+
+# =============================================================================
+# Red interna
+# =============================================================================
+networks:
+  mundial-net:
+    driver: bridge

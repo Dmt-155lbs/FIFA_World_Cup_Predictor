@@ -1,0 +1,56 @@
+# =============================================================================
+# .gitignore — Mundial FIFA 2026 Predictor
+# =============================================================================
+
+# --- Secretos y configuración local ---
+.env
+.env.local
+.env.*.local
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# --- Entorno virtual ---
+.venv/
+venv/
+ENV/
+
+# --- Tests ---
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Datos y caché ---
+data/cache/*
+!data/cache/.gitkeep
+
+# --- MLflow ---
+mlflow_artifacts/
+mlruns/
+
+# --- Jupyter Notebooks ---
+notebooks/.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# --- Sistema operativo ---
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# --- Docker ---
+*.log

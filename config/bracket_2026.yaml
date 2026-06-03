@@ -1,0 +1,316 @@
+# =============================================================================
+# Archivo : bracket_2026.yaml
+# Propósito: Configuración completamente parametrizada del formato del
+#            Mundial FIFA 2026 (48 equipos, 12 grupos de 4).
+#            Define composición de grupos, reglas de desempate, mapeo del
+#            bracket eliminatorio y parámetros del modelo de predicción.
+# Autor    : Sistema de Predicción – Mundial FIFA 2026
+# Fecha    : 2026-06-02
+# =============================================================================
+
+# =============================================================================
+# METADATOS DEL TORNEO
+# =============================================================================
+torneo:
+  nombre: "Copa Mundial de la FIFA 2026"
+  paises_sede:
+    - "Estados Unidos"
+    - "México"
+    - "Canadá"
+  fecha_inicio: "2026-06-11"
+  fecha_final: "2026-07-19"
+  total_equipos: 48
+  total_grupos: 12
+  equipos_por_grupo: 4
+
+# =============================================================================
+# FASE DE GRUPOS
+# Composición de los 12 grupos (A–L).
+# Los equipos se marcan como "TBD" (por definir) hasta el sorteo oficial.
+# Posiciones 1–4 dentro de cada grupo corresponden al cabeza de serie y
+# los tres restantes según el procedimiento de sorteo FIFA.
+# =============================================================================
+fase_de_grupos:
+  formato:
+    partidos_por_grupo: 6          # Round-robin completo de 4 equipos
+    puntos_victoria: 3
+    puntos_empate: 1
+    puntos_derrota: 0
+
+  grupos:
+    A:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    B:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    C:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    D:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    E:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    F:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    G:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    H:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    I:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    J:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    K:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+    L:
+      - { posicion: 1, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 2, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 3, equipo: "TBD", fifa_code: "TBD" }
+      - { posicion: 4, equipo: "TBD", fifa_code: "TBD" }
+
+# =============================================================================
+# REGLAS DE DESEMPATE
+# Se aplican en orden descendente de prioridad. Si un criterio no rompe
+# el empate, se pasa al siguiente.
+# =============================================================================
+reglas_desempate:
+  descripcion: >
+    Criterios de desempate para la clasificación dentro de cada grupo,
+    aplicados en el orden listado según el reglamento FIFA.
+  criterios:
+    - { prioridad: 1, criterio: "puntos",               descripcion: "Mayor número de puntos obtenidos en los partidos del grupo" }
+    - { prioridad: 2, criterio: "diferencia_de_goles",   descripcion: "Mayor diferencia de goles (GF - GC) en los partidos del grupo" }
+    - { prioridad: 3, criterio: "goles_a_favor",         descripcion: "Mayor número de goles anotados en los partidos del grupo" }
+    - { prioridad: 4, criterio: "enfrentamiento_directo", descripcion: "Resultado del enfrentamiento directo entre los equipos empatados (h2h)" }
+    - { prioridad: 5, criterio: "tarjetas_fair_play",    descripcion: "Menor puntuación de fair play (tarjetas amarillas y rojas)" }
+    - { prioridad: 6, criterio: "sorteo_fifa",           descripcion: "Sorteo realizado por la FIFA como último recurso" }
+
+# =============================================================================
+# REGLAS PARA LOS 8 MEJORES TERCEROS
+# De los 12 terceros de grupo, los 8 mejores avanzan a la Ronda de 32.
+# La clasificación se realiza con los mismos criterios de desempate
+# aplicados entre los 12 terceros.
+# =============================================================================
+mejores_terceros:
+  descripcion: >
+    De los 12 equipos que terminen en tercer lugar de su grupo, los 8
+    con mejor rendimiento avanzan a la Ronda de 32. Se eliminan los 4
+    peores terceros. El ranking usa los mismos criterios de desempate
+    de la fase de grupos, comparando solo sus resultados grupales.
+  cantidad_clasificados: 8
+  cantidad_eliminados: 4
+  criterios_ranking:
+    - "puntos"
+    - "diferencia_de_goles"
+    - "goles_a_favor"
+    - "tarjetas_fair_play"
+    - "sorteo_fifa"
+
+  # =========================================================================
+  # MAPEO DE TERCEROS EN EL BRACKET
+  # Dependiendo de qué 8 grupos produzcan los terceros clasificados,
+  # se aplica una tabla de asignación predefinida por FIFA.
+  # Cada combinación de 8 grupos (de los 12 posibles) tiene un mapeo
+  # único que asigna cada tercer clasificado a una posición específica
+  # en la Ronda de 32.
+  # Formato: la clave es la combinación de letras de grupo (ordenadas),
+  # el valor es la asignación de cada grupo a su partido R32.
+  # =========================================================================
+  tabla_asignacion:
+    # Ejemplo: Si los 8 mejores terceros vienen de los grupos
+    # A, B, C, D, E, F, G, H, entonces:
+    #   - 3ro de A va al partido R32_01
+    #   - 3ro de B va al partido R32_03, etc.
+    # Esta tabla se completa cuando FIFA publique el mapeo oficial.
+    # Las combinaciones posibles son C(12,8) = 495.
+    # Aquí se incluyen las variantes representativas.
+    "ABCDEFGH":
+      A: "R32_01"
+      B: "R32_03"
+      C: "R32_06"
+      D: "R32_08"
+      E: "R32_10"
+      F: "R32_12"
+      G: "R32_14"
+      H: "R32_16"
+    "ABCDEFGI":
+      A: "R32_01"
+      B: "R32_03"
+      C: "R32_06"
+      D: "R32_08"
+      E: "R32_10"
+      F: "R32_12"
+      G: "R32_14"
+      I: "R32_16"
+    # -- Agregar las demás combinaciones según publicación FIFA --
+    # NOTA: El motor de bracket lee dinámicamente esta tabla.
+    # Si una combinación no está mapeada, se usará el mapeo
+    # por defecto basado en el orden alfabético de los grupos.
+
+# =============================================================================
+# CLASIFICACIÓN A FASE ELIMINATORIA
+# Resumen de cómo avanzan los 32 equipos.
+# =============================================================================
+clasificacion:
+  descripcion: >
+    Avanzan a la Ronda de 32 los 24 primeros y segundos de grupo
+    (2 × 12 = 24) más los 8 mejores terceros, totalizando 32 equipos.
+  metodo:
+    - { tipo: "primero_de_grupo",  cantidad: 12, total: 12 }
+    - { tipo: "segundo_de_grupo",  cantidad: 12, total: 12 }
+    - { tipo: "mejor_tercero",     cantidad: 8,  total: 8 }
+  total_clasificados: 32
+
+# =============================================================================
+# BRACKET ELIMINATORIO (RONDA DE 32 → FINAL)
+# Estructura completamente parametrizada. Cada partido se define por:
+#   - id:   Identificador único del partido
+#   - local / visitante: posición de grupo que alimenta el partido
+#     Formato: "{posicion}{grupo}" donde posicion = 1 (primero), 2 (segundo),
+#              3 (tercer clasificado); grupo = A–L.
+#              Para rondas posteriores, se referencia el ganador de un
+#              partido anterior con "W_{id_partido}".
+#   - ronda: nombre de la fase eliminatoria
+# =============================================================================
+bracket_eliminatorio:
+
+  # ===========================================================================
+  # RONDA DE 32 (16 partidos)
+  # Los primeros de grupo enfrentan a segundos o terceros de otros grupos.
+  # La estructura evita que equipos del mismo grupo se crucen en R32.
+  # ===========================================================================
+  ronda_de_32:
+    - { id: "R32_01", local: "1A", visitante: "2C",  ronda: "Ronda de 32" }
+    - { id: "R32_02", local: "1B", visitante: "2D",  ronda: "Ronda de 32" }
+    - { id: "R32_03", local: "1C", visitante: "2F",  ronda: "Ronda de 32" }
+    - { id: "R32_04", local: "1D", visitante: "2E",  ronda: "Ronda de 32" }
+    - { id: "R32_05", local: "1E", visitante: "2H",  ronda: "Ronda de 32" }
+    - { id: "R32_06", local: "1F", visitante: "2G",  ronda: "Ronda de 32" }
+    - { id: "R32_07", local: "1G", visitante: "2J",  ronda: "Ronda de 32" }
+    - { id: "R32_08", local: "1H", visitante: "2I",  ronda: "Ronda de 32" }
+    - { id: "R32_09", local: "1I", visitante: "2L",  ronda: "Ronda de 32" }
+    - { id: "R32_10", local: "1J", visitante: "2K",  ronda: "Ronda de 32" }
+    - { id: "R32_11", local: "1K", visitante: "2A",  ronda: "Ronda de 32" }
+    - { id: "R32_12", local: "1L", visitante: "2B",  ronda: "Ronda de 32" }
+    # Partidos donde entran los mejores terceros (asignados dinámicamente)
+    - { id: "R32_13", local: "1A", visitante: "3_SLOT_1", ronda: "Ronda de 32" }
+    - { id: "R32_14", local: "1D", visitante: "3_SLOT_2", ronda: "Ronda de 32" }
+    - { id: "R32_15", local: "1G", visitante: "3_SLOT_3", ronda: "Ronda de 32" }
+    - { id: "R32_16", local: "1J", visitante: "3_SLOT_4", ronda: "Ronda de 32" }
+
+  # ===========================================================================
+  # OCTAVOS DE FINAL (8 partidos)
+  # ===========================================================================
+  octavos_de_final:
+    - { id: "OF_01", local: "W_R32_01", visitante: "W_R32_02", ronda: "Octavos de Final" }
+    - { id: "OF_02", local: "W_R32_03", visitante: "W_R32_04", ronda: "Octavos de Final" }
+    - { id: "OF_03", local: "W_R32_05", visitante: "W_R32_06", ronda: "Octavos de Final" }
+    - { id: "OF_04", local: "W_R32_07", visitante: "W_R32_08", ronda: "Octavos de Final" }
+    - { id: "OF_05", local: "W_R32_09", visitante: "W_R32_10", ronda: "Octavos de Final" }
+    - { id: "OF_06", local: "W_R32_11", visitante: "W_R32_12", ronda: "Octavos de Final" }
+    - { id: "OF_07", local: "W_R32_13", visitante: "W_R32_14", ronda: "Octavos de Final" }
+    - { id: "OF_08", local: "W_R32_15", visitante: "W_R32_16", ronda: "Octavos de Final" }
+
+  # ===========================================================================
+  # CUARTOS DE FINAL (4 partidos)
+  # ===========================================================================
+  cuartos_de_final:
+    - { id: "QF_01", local: "W_OF_01", visitante: "W_OF_02", ronda: "Cuartos de Final" }
+    - { id: "QF_02", local: "W_OF_03", visitante: "W_OF_04", ronda: "Cuartos de Final" }
+    - { id: "QF_03", local: "W_OF_05", visitante: "W_OF_06", ronda: "Cuartos de Final" }
+    - { id: "QF_04", local: "W_OF_07", visitante: "W_OF_08", ronda: "Cuartos de Final" }
+
+  # ===========================================================================
+  # SEMIFINALES (2 partidos)
+  # ===========================================================================
+  semifinales:
+    - { id: "SF_01", local: "W_QF_01", visitante: "W_QF_02", ronda: "Semifinal" }
+    - { id: "SF_02", local: "W_QF_03", visitante: "W_QF_04", ronda: "Semifinal" }
+
+  # ===========================================================================
+  # TERCER PUESTO
+  # ===========================================================================
+  tercer_puesto:
+    - { id: "TP_01", local: "L_SF_01", visitante: "L_SF_02", ronda: "Tercer Puesto" }
+
+  # ===========================================================================
+  # FINAL
+  # ===========================================================================
+  final:
+    - { id: "FIN_01", local: "W_SF_01", visitante: "W_SF_02", ronda: "Final" }
+
+# =============================================================================
+# PARÁMETROS DEL MODELO DE PREDICCIÓN PARA FASES ELIMINATORIAS
+# Ajustes específicos para partidos de eliminación directa.
+# =============================================================================
+parametros_eliminatoria:
+  descripcion: >
+    Parámetros que modifican el comportamiento del modelo predictivo
+    en partidos de eliminación directa (sin empates posibles).
+
+  # Factor de ajuste para tiempo extra.
+  # 1/3 representa que el tiempo extra (30 min) es un tercio de los
+  # 90 minutos reglamentarios, escalando las probabilidades.
+  factor_tiempo_extra: 0.3333
+
+  # Bonus Elo para penales.
+  # Se aplica un ajuste mínimo de +0.03 al equipo con mayor rating Elo
+  # para reflejar la ligera ventaja estadística en tandas de penales.
+  bonus_elo_penales: 0.03
+
+  # Probabilidad base de empate al final del tiempo extra
+  # (antes de penales). Se usa para determinar cuántos partidos
+  # llegan a penales en la simulación Monte Carlo.
+  prob_penales_base: 0.25
+
+  # Número de simulaciones Monte Carlo para el bracket completo
+  simulaciones_monte_carlo: 100000
+
+# =============================================================================
+# CONVENCIONES DE NOMBRES EN EL BRACKET
+# Leyenda para interpretar las etiquetas del bracket.
+# =============================================================================
+convenciones:
+  posicion_grupo:
+    "1": "Primero del grupo"
+    "2": "Segundo del grupo"
+    "3": "Tercer clasificado (mejor tercero)"
+  prefijos_eliminatoria:
+    "W_": "Ganador del partido referenciado"
+    "L_": "Perdedor del partido referenciado"
+  slots_terceros:
+    "3_SLOT_N": >
+      Placeholder para el N-ésimo mejor tercero. Se resuelve
+      dinámicamente en tiempo de ejecución según la tabla de
+      asignación definida en mejores_terceros.tabla_asignacion.

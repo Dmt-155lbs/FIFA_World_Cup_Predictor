@@ -1,0 +1,98 @@
+# =============================================================================
+# pyproject.toml — Mundial FIFA 2026 Predictor
+# =============================================================================
+# Configuración centralizada del proyecto Python.
+# XGBoost se ejecuta exclusivamente en CPU (tree_method='hist').
+# =============================================================================
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "mundial-predictor"
+version = "0.1.0"
+description = "Sistema de predicción para el Mundial FIFA 2026 — Ensemble Híbrido (XGBoost + Poisson Bivariado + Monte Carlo)"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Mundial 2026 Team"},
+]
+
+# --- Dependencias principales ---
+dependencies = [
+    # Motor de predicción
+    "xgboost>=2.1",
+    "scikit-learn",
+    "scipy",
+    "numpy",
+    "numba",
+
+    # Datos y validación
+    "pandas",
+    "pydantic>=2.0",
+    "pydantic-settings",
+
+    # Base de datos
+    "sqlalchemy>=2.0",
+    "pyodbc",
+
+    # Datos de fútbol
+    "soccerdata>=1.3",
+
+    # MLflow — seguimiento de experimentos
+    "mlflow>=2.14",
+
+    # Interpretabilidad y optimización
+    "shap>=0.45",
+    "optuna",
+
+    # Dashboard
+    "streamlit>=1.36",
+
+    # Resiliencia y logging
+    "tenacity",
+    "structlog",
+
+    # Visualización
+    "matplotlib",
+    "seaborn",
+    "plotly",
+
+    # Utilidades
+    "requests",
+    "pyyaml",
+    "apscheduler",
+
+    # Métricas probabilísticas
+    "properscoring",
+]
+
+# --- Dependencias de desarrollo ---
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "httpx",
+]
+
+# --- Configuración de herramientas ---
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
