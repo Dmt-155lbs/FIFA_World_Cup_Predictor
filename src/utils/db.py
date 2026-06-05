@@ -20,11 +20,14 @@ def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
+        kwargs = {"pool_pre_ping": True}
+        if not settings.db_connection_string.startswith("sqlite"):
+            kwargs["pool_size"] = 5
+            kwargs["max_overflow"] = 10
+            
         _engine = create_engine(
             settings.db_connection_string,
-            pool_size=5,
-            max_overflow=10,
-            pool_pre_ping=True
+            **kwargs
         )
     return _engine
 

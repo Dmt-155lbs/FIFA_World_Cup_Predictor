@@ -43,9 +43,9 @@ class MatchValidator(BaseModel):
     attendance: int = SENTINEL_INT
 
     @field_validator('home_goals', 'away_goals', 'attendance', mode='before')
-    def handle_int_nulls(cls, v: Any) -> Any:
+    def handle_int_nulls(cls, v: Any, info) -> Any:
         if v is None or (isinstance(v, float) and math.isnan(v)):
-            return SENTINEL_INT if getattr(cls, 'attendance', None) else 0 # 0 for goals if null
+            return SENTINEL_INT if info.field_name == 'attendance' else 0
         return int(v)
 
     @field_validator('venue', mode='before')
