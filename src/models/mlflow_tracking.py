@@ -148,6 +148,57 @@ class ExperimentTracker:
             modelo=model_name,
         )
 
+    def log_artifact(self, local_path: str, artifact_path: str | None = None) -> None:
+        """
+        Registra un archivo local como un artefacto en el run activo.
+
+        Args:
+            local_path: Ruta al archivo en el disco local.
+            artifact_path: Directorio de destino dentro del run en MLflow.
+                           Si es None, se guarda en la raíz de artefactos del run.
+
+        Raises:
+            RuntimeError: Si no hay un run activo.
+        """
+        if self._active_run_id is None:
+            raise RuntimeError(
+                "No hay un run activo. Ejecute start_run() primero."
+            )
+
+        mlflow.log_artifact(local_path, artifact_path)
+
+        log.info(
+            "Artefacto registrado en MLflow",
+            run_id=self._active_run_id,
+            archivo=local_path,
+            destino=artifact_path,
+        )
+
+    def log_artifacts(self, local_dir: str, artifact_path: str | None = None) -> None:
+        """
+        Registra todos los archivos de un directorio como artefactos en el run activo.
+
+        Args:
+            local_dir: Ruta al directorio en el disco local.
+            artifact_path: Directorio de destino dentro del run en MLflow.
+
+        Raises:
+            RuntimeError: Si no hay un run activo.
+        """
+        if self._active_run_id is None:
+            raise RuntimeError(
+                "No hay un run activo. Ejecute start_run() primero."
+            )
+
+        mlflow.log_artifacts(local_dir, artifact_path)
+
+        log.info(
+            "Artefactos del directorio registrados en MLflow",
+            run_id=self._active_run_id,
+            directorio=local_dir,
+            destino=artifact_path,
+        )
+
     def end_run(self) -> None:
         """
         Finaliza el run activo de MLflow.

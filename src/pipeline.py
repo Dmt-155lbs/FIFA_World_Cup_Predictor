@@ -20,9 +20,12 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import structlog
+import os
+import tempfile
 
 from src.config import get_settings
 from src.features.feature_engineering import FeatureEngineer
+from src.explainability.shap_analysis import SHAPAnalyzer
 from src.models.xgboost_trainer import XGBoostTrainer
 from src.models.optuna_optimizer import OptunaOptimizer
 from src.models.mlflow_tracking import ExperimentTracker
@@ -197,6 +200,43 @@ class PredictionPipeline:
         # Logear métricas y modelo en MLflow
         self.tracker.log_metrics(metrics)
         self.tracker.log_model(self.trainer, "xgboost_ensemble")
+
+        # --- Análisis SHAP y registro de artefactos ---
+        try:
+            logger.info("Iniciando análisis SHAP...")
+            feature_names = list(X.columns)
+            shap_analyzer = SHAPAnalyzer(
+                model_home=self.trainer.model_home,
+                model_away=self.trainer.model_away,
+                feature_names=feature_names,
+            )
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                # Summary plots
+                summary_files = shap_analyzer.plot_summary(X, save_dir=tmp_dir)
+                for f in summary_files:
+                    self.tracker.log_artifact(f, "shap_summary")
+
+                # Waterfall plot para un partido de muestra
+                if len(X) > 0:
+                    sample_idx = 0
+                    sample_features = X.iloc[[sample_idx]]
+                    # Obtener nombres de equipos si están disponibles en índices o usar genéricos
+                    home_team = "Local_Sample"
+                    away_team = "Visitante_Sample"
+                    
+                    waterfall_files = shap_analyzer.explain_match(
+                        match_features=sample_features,
+                        team_home=home_team,
+                        team_away=away_team,
+                        save_dir=tmp_dir,
+                    )
+                    for f in waterfall_files:
+                        self.tracker.log_artifact(f, "shap_waterfall")
+            logger.info("Análisis SHAP completado y registrado.")
+        except Exception as e:
+            logger.error("Error durante el análisis SHAP", error=str(e))
+
         self.tracker.end_run()
 
         # Guardar modelo en disco
