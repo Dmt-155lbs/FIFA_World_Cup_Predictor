@@ -38,7 +38,7 @@ GO
 --                - Ratings Elo de ambos equipos (FACT_ELO_HISTORY)
 --                - Delta Elo reciente vía LAG window function
 --                - Estadísticas de goles esperados (FACT_MATCH_XG)
---                - Valor de mercado de la plantilla (FACT_SQUAD_VALUE)
+--                - Valor de mercado de la plantilla (FACT_FIFA_RATING)
 --              Las columnas target son home_goals y away_goals.
 -- ============================================================================
 CREATE VIEW [mundial].[vw_feature_store]
@@ -111,14 +111,14 @@ SELECT
     -- del valor de mercado (en EUR). Se usa LOG(valor + 1) para evitar
     -- LOG(0) cuando el valor centinela es 0.0.
     -- ====================================================================
-    ISNULL(LOG(svh.[market_value_eur] + 1), 0.0)            AS [home_squad_value_log],
-    ISNULL(LOG(sva.[market_value_eur] + 1), 0.0)            AS [away_squad_value_log],
-    ISNULL(svh.[squad_size],            -1)                  AS [home_squad_size],
-    ISNULL(sva.[squad_size],            -1)                  AS [away_squad_size],
-    ISNULL(svh.[avg_age],              0.0)                  AS [home_avg_age],
-    ISNULL(sva.[avg_age],              0.0)                  AS [away_avg_age],
-    ISNULL(svh.[total_caps],            -1)                  AS [home_total_caps],
-    ISNULL(sva.[total_caps],            -1)                  AS [away_total_caps],
+    ISNULL(svh.[attack_rating], 0.0)            AS [home_fifa_attack],
+    ISNULL(sva.[attack_rating], 0.0)            AS [away_fifa_attack],
+    ISNULL(svh.[overall_rating],            -1)                  AS [home_fifa_overall],
+    ISNULL(sva.[overall_rating],            -1)                  AS [away_fifa_overall],
+    ISNULL(svh.[midfield_rating],              0.0)                  AS [home_fifa_midfield],
+    ISNULL(sva.[midfield_rating],              0.0)                  AS [away_fifa_midfield],
+    ISNULL(svh.[defence_rating],            -1)                  AS [home_fifa_defence],
+    ISNULL(sva.[defence_rating],            -1)                  AS [away_fifa_defence],
 
     -- ====================================================================
     -- Carga de minutos normalizada
@@ -126,13 +126,13 @@ SELECT
     -- obtener un ratio de carga relativa de la plantilla.
     -- ====================================================================
     ISNULL(
-        CAST(svh.[total_minutes_season] AS FLOAT) / 4500.0,
+        svh.[overall_rating],
         0.0
-    )                                                        AS [home_minutes_load],
+    )                                                        AS [home_fifa_overall_copy],
     ISNULL(
-        CAST(sva.[total_minutes_season] AS FLOAT) / 4500.0,
+        sva.[overall_rating],
         0.0
-    )                                                        AS [away_minutes_load],
+    )                                                        AS [away_fifa_overall_copy],
 
     -- ====================================================================
     -- Variables objetivo (targets) para el modelo
@@ -197,12 +197,12 @@ LEFT JOIN [mundial].[FACT_MATCH_XG] AS xg
 -- ====================================================================
 OUTER APPLY (
     SELECT TOP 1
-        sv.[market_value_eur],
-        sv.[squad_size],
-        sv.[avg_age],
-        sv.[total_caps],
-        sv.[total_minutes_season]
-    FROM [mundial].[FACT_SQUAD_VALUE] AS sv
+        sv.[attack_rating],
+        sv.[overall_rating],
+        sv.[midfield_rating],
+        sv.[defence_rating],
+        
+    FROM [mundial].[FACT_FIFA_RATING] AS sv
     WHERE sv.[team_id]        = m.[home_team_id]
       AND sv.[valuation_date] <= m.[match_date]
     ORDER BY sv.[valuation_date] DESC
@@ -213,12 +213,12 @@ OUTER APPLY (
 -- ====================================================================
 OUTER APPLY (
     SELECT TOP 1
-        sv.[market_value_eur],
-        sv.[squad_size],
-        sv.[avg_age],
-        sv.[total_caps],
-        sv.[total_minutes_season]
-    FROM [mundial].[FACT_SQUAD_VALUE] AS sv
+        sv.[attack_rating],
+        sv.[overall_rating],
+        sv.[midfield_rating],
+        sv.[defence_rating],
+        
+    FROM [mundial].[FACT_FIFA_RATING] AS sv
     WHERE sv.[team_id]        = m.[away_team_id]
       AND sv.[valuation_date] <= m.[match_date]
     ORDER BY sv.[valuation_date] DESC

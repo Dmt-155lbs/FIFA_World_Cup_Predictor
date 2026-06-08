@@ -51,10 +51,6 @@ _NON_FEATURE_COLS: list[str] = [
 # ── Columnas enteras donde -1 es centinela ───────────────────────────────────
 _SENTINEL_INT_COLS: list[str] = [
     "attendance",
-    "home_squad_size",
-    "away_squad_size",
-    "home_total_caps",
-    "away_total_caps",
 ]
 
 
@@ -246,7 +242,7 @@ class FeatureEngineer:
         Columnas generadas:
         - ``xg_diff``: rolling xG home − rolling xG away
         - ``form_diff``: rolling form home − rolling form away
-        - ``squad_value_diff``: valor de plantilla (log) home − away
+        - ``fifa_attack_diff``: valor de ataque fifa (log) home − away
         - ``goals_diff``: rolling goles anotados home − away
         - ``elo_diff`` ya existe en la vista y se preserva.
 
@@ -264,8 +260,8 @@ class FeatureEngineer:
 
         df["xg_diff"] = df["home_rolling_xg"] - df["away_rolling_xg"]
         df["form_diff"] = df["home_rolling_form"] - df["away_rolling_form"]
-        df["squad_value_diff"] = (
-            df["home_squad_value_log"] - df["away_squad_value_log"]
+        df["fifa_attack_diff"] = (
+            df["home_fifa_attack"] - df["away_fifa_attack"]
         )
         df["goals_diff"] = (
             df["home_rolling_goals_scored"] - df["away_rolling_goals_scored"]
@@ -273,7 +269,7 @@ class FeatureEngineer:
 
         logger.info(
             "features_diferenciales_calculadas",
-            columnas=["xg_diff", "form_diff", "squad_value_diff", "goals_diff"],
+            columnas=["xg_diff", "form_diff", "fifa_attack_diff", "goals_diff"],
         )
         return df
 

@@ -17,6 +17,7 @@ from src.utils.constants import (
     K_FACTOR,
     ROLLING_WINDOW_MATCHES,
     SENTINEL_INT,
+    SENTINEL_FLOAT,
 )
 
 
@@ -75,16 +76,16 @@ def synthetic_matches() -> pd.DataFrame:
             "away_xga": round(float(np.random.uniform(0.5, 3.0)), 2),
             "home_npxg": round(float(np.random.uniform(0.3, 2.5)), 2),
             "away_npxg": round(float(np.random.uniform(0.2, 2.0)), 2),
-            "home_squad_value_log": round(float(np.random.uniform(7.0, 9.0)), 2),
-            "away_squad_value_log": round(float(np.random.uniform(7.0, 9.0)), 2),
-            "home_squad_size": 26,
-            "away_squad_size": 26,
-            "home_avg_age": round(float(np.random.uniform(25.0, 29.0)), 1),
-            "away_avg_age": round(float(np.random.uniform(25.0, 29.0)), 1),
-            "home_total_caps": int(np.random.randint(300, 800)),
-            "away_total_caps": int(np.random.randint(300, 800)),
-            "home_minutes_load": float(np.random.randint(3000, 5000)),
-            "away_minutes_load": float(np.random.randint(3000, 5000)),
+            "home_fifa_attack": round(float(np.random.uniform(7.0, 9.0)), 2),
+            "away_fifa_attack": round(float(np.random.uniform(7.0, 9.0)), 2),
+            "home_fifa_overall": 26,
+            "away_fifa_overall": 26,
+            "home_fifa_midfield": round(float(np.random.uniform(25.0, 29.0)), 1),
+            "away_fifa_midfield": round(float(np.random.uniform(25.0, 29.0)), 1),
+            "home_fifa_defence": int(np.random.randint(300, 800)),
+            "away_fifa_defence": int(np.random.randint(300, 800)),
+            "home_fifa_overall_copy": float(np.random.randint(3000, 5000)),
+            "away_fifa_overall_copy": float(np.random.randint(3000, 5000)),
             "home_goals": home_goals,
             "away_goals": away_goals,
             "ingested_at": pd.Timestamp("2024-01-01"),
@@ -120,9 +121,9 @@ def df_with_sentinels(synthetic_matches: pd.DataFrame) -> pd.DataFrame:
     df = synthetic_matches.copy()
     # Inyectar centinelas -1 en filas específicas
     df.loc[0, "attendance"] = SENTINEL_INT
-    df.loc[1, "home_squad_size"] = SENTINEL_INT
-    df.loc[2, "away_total_caps"] = SENTINEL_INT
-    df.loc[3, "home_total_caps"] = SENTINEL_INT
+    df.loc[1, "home_fifa_overall"] = SENTINEL_FLOAT
+    df.loc[2, "away_fifa_defence"] = SENTINEL_FLOAT
+    df.loc[3, "home_fifa_defence"] = SENTINEL_FLOAT
     return df
 
 
@@ -195,7 +196,7 @@ class TestDifferentialFeatures:
     ) -> None:
         """Verifica que las columnas diferenciales existen."""
         result = engineer.compute_differential_features(df_with_rolling)
-        for col in ["xg_diff", "form_diff", "squad_value_diff", "goals_diff"]:
+        for col in ["xg_diff", "form_diff", "fifa_attack_diff", "goals_diff"]:
             assert col in result.columns, f"Falta columna diferencial: {col}"
 
     def test_differential_values_correct(
@@ -204,12 +205,12 @@ class TestDifferentialFeatures:
         """Verifica que la diferencia es exactamente home − away."""
         result = engineer.compute_differential_features(df_with_rolling)
 
-        # squad_value_diff = home_squad_value_log - away_squad_value_log
+        # fifa_attack_diff = home_fifa_attack - away_fifa_attack
         expected_sv = (
-            result["home_squad_value_log"] - result["away_squad_value_log"]
+            result["home_fifa_attack"] - result["away_fifa_attack"]
         )
         pd.testing.assert_series_equal(
-            result["squad_value_diff"],
+            result["fifa_attack_diff"],
             expected_sv,
             check_names=False,
         )
@@ -301,7 +302,7 @@ class TestSentinelHandling:
         result = engineer.handle_sentinels(df_with_sentinels)
         # Después de reemplazar -1 → NaN → mediana, los valores deben ser
         # razonables (no -1)
-        for col in ["attendance", "home_squad_size", "away_total_caps"]:
+        for col in ["attendance"]:
             assert (result[col] >= 0).all(), (
                 f"Columna {col} tiene valores negativos tras imputación"
             )

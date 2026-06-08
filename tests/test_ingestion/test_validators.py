@@ -8,7 +8,7 @@ import math
 
 from src.ingestion.validators import (
     TeamValidator, MatchValidator, EloHistoryValidator,
-    SquadValueValidator, MatchXGValidator, OddsValidator
+    FifaRatingValidator, MatchXGValidator, OddsValidator
 )
 from src.utils.constants import SENTINEL_INT, SENTINEL_FLOAT, SENTINEL_STR, SENTINEL_DATE
 
@@ -59,21 +59,19 @@ def test_elo_validator_valid_data():
     )
     assert elo.elo_rating == 2100.5
 
-def test_squad_value_validator_null_handling():
-    """Test nulos en SquadValue."""
-    sv = SquadValueValidator(
+def test_fifa_rating_validator_null_handling():
+    """Test nulos en FifaRating."""
+    sv = FifaRatingValidator(
         team_id=1,
-        market_value_eur=None,
-        squad_size=float('nan'),
-        avg_age=None,
-        total_caps=None,
-        total_minutes_season=None
+        attack_rating=None,
+        overall_rating=float('nan'),
+        midfield_rating=None,
+        defence_rating=None
     )
-    assert sv.market_value_eur == SENTINEL_FLOAT
-    assert sv.squad_size == SENTINEL_INT
-    assert sv.avg_age == SENTINEL_FLOAT
-    assert sv.total_caps == SENTINEL_INT
-    assert sv.total_minutes_season == SENTINEL_INT
+    assert sv.attack_rating == SENTINEL_FLOAT
+    assert sv.overall_rating == SENTINEL_FLOAT
+    assert sv.midfield_rating == SENTINEL_FLOAT
+    assert sv.defence_rating == SENTINEL_FLOAT
 
 def test_xg_validator_valid_data():
     """Test datos válidos para xG."""

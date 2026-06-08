@@ -188,7 +188,7 @@ END
 GO
 
 -- ============================================================================
--- TABLA: mundial.FACT_SQUAD_VALUE
+-- TABLA: mundial.FACT_FIFA_RATING
 -- Descripción: Valor de mercado y estadísticas agregadas de la plantilla
 --              de cada selección. Datos obtenidos de Transfermarkt u otras
 --              fuentes de valuación.
@@ -196,13 +196,13 @@ GO
 IF NOT EXISTS (
     SELECT 1 FROM sys.tables t
     JOIN sys.schemas s ON t.schema_id = s.schema_id
-    WHERE s.name = N'mundial' AND t.name = N'FACT_SQUAD_VALUE'
+    WHERE s.name = N'mundial' AND t.name = N'FACT_FIFA_RATING'
 )
 BEGIN
-    CREATE TABLE [mundial].[FACT_SQUAD_VALUE]
+    CREATE TABLE [mundial].[FACT_FIFA_RATING]
     (
         -- Clave primaria auto-incremental
-        [value_id]              BIGINT        IDENTITY(1,1)   NOT NULL,
+        [rating_id]              BIGINT        IDENTITY(1,1)   NOT NULL,
 
         -- Referencia al equipo (FK → DIM_TEAM)
         [team_id]               INT           NOT NULL,
@@ -211,36 +211,36 @@ BEGIN
         [valuation_date]        DATE          NOT NULL  DEFAULT '1900-01-01',
 
         -- Valor de mercado total en EUR
-        [market_value_eur]      DECIMAL(18,2) NOT NULL  DEFAULT 0.0,
+        [overall_rating]        FLOAT         NOT NULL  DEFAULT 0.0,
 
         -- Tamaño de la plantilla; -1 si no disponible
-        [squad_size]            INT           NOT NULL  DEFAULT -1,
+        [attack_rating]         FLOAT         NOT NULL  DEFAULT 0.0,
 
         -- Edad promedio de los jugadores
-        [avg_age]               FLOAT         NOT NULL  DEFAULT 0.0,
+        [midfield_rating]       FLOAT         NOT NULL  DEFAULT 0.0,
 
         -- Total de internacionalidades acumuladas
-        [total_caps]            INT           NOT NULL  DEFAULT -1,
+        [defence_rating]        FLOAT         NOT NULL  DEFAULT 0.0,
 
         -- Minutos totales jugados en la temporada de clubes
-        [total_minutes_season]  INT           NOT NULL  DEFAULT -1,
+        
 
         -- =================================================================
         -- Restricciones
         -- =================================================================
-        CONSTRAINT [PK_FACT_SQUAD_VALUE]
-            PRIMARY KEY CLUSTERED ([value_id]),
+        CONSTRAINT [PK_FACT_FIFA_RATING]
+            PRIMARY KEY CLUSTERED ([rating_id]),
 
-        CONSTRAINT [FK_SQUAD_TEAM]
+        CONSTRAINT [FK_FIFA_RATING_TEAM]
             FOREIGN KEY ([team_id])
             REFERENCES [mundial].[DIM_TEAM] ([team_id])
     );
 
-    PRINT '✔ Tabla [mundial].[FACT_SQUAD_VALUE] creada exitosamente.';
+    PRINT '✔ Tabla [mundial].[FACT_FIFA_RATING] creada exitosamente.';
 END
 ELSE
 BEGIN
-    PRINT 'ℹ La tabla [mundial].[FACT_SQUAD_VALUE] ya existe.';
+    PRINT 'ℹ La tabla [mundial].[FACT_FIFA_RATING] ya existe.';
 END
 GO
 
@@ -530,7 +530,7 @@ PRINT ' 03_create_facts.sql ejecutado correctamente.';
 PRINT ' Tablas creadas:';
 PRINT '   - mundial.FACT_MATCH';
 PRINT '   - mundial.FACT_ELO_HISTORY';
-PRINT '   - mundial.FACT_SQUAD_VALUE';
+PRINT '   - mundial.FACT_FIFA_RATING';
 PRINT '   - mundial.FACT_MATCH_XG';
 PRINT '   - mundial.FACT_ODDS';
 PRINT '   - mundial.FACT_PREDICTIONS';

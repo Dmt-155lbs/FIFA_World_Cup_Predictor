@@ -49,11 +49,10 @@ FEATURE_COLUMNS = [
     'home_xga', 'away_xga',
     'home_npxg', 'away_npxg',
     # Valor de plantilla
-    'home_squad_value_log', 'away_squad_value_log',
-    'home_squad_size', 'away_squad_size',
-    'home_avg_age', 'away_avg_age',
-    'home_total_caps', 'away_total_caps',
-    'home_minutes_load', 'away_minutes_load',
+    'home_fifa_attack', 'away_fifa_attack',
+    'home_fifa_overall', 'away_fifa_overall',
+    'home_fifa_midfield', 'away_fifa_midfield',
+    'home_fifa_defence', 'away_fifa_defence',
     # Contexto del partido
     'is_neutral', 'is_knockout',
     'competition_weight',
@@ -65,7 +64,7 @@ FEATURE_COLUMNS = [
     'home_rolling_form', 'away_rolling_form',
     'home_elo_momentum', 'away_elo_momentum',
     # Diferenciales
-    'xg_diff', 'form_diff', 'squad_value_diff',
+    'xg_diff', 'form_diff', 'fifa_attack_diff',
     'goals_diff',
     # Contexto temporal
     'home_days_rest', 'away_days_rest',

@@ -90,28 +90,21 @@ class EloHistoryValidator(BaseModel):
         return self.model_dump()
 
 
-class SquadValueValidator(BaseModel):
+class FifaRatingValidator(BaseModel):
     team_id: int
-    valuation_date: date = SENTINEL_DATE
-    market_value_eur: float = SENTINEL_FLOAT
-    squad_size: int = SENTINEL_INT
-    avg_age: float = SENTINEL_FLOAT
-    total_caps: int = SENTINEL_INT
-    total_minutes_season: int = SENTINEL_INT
+    rating_date: date = SENTINEL_DATE
+    overall_rating: float = SENTINEL_FLOAT
+    attack_rating: float = SENTINEL_FLOAT
+    midfield_rating: float = SENTINEL_FLOAT
+    defence_rating: float = SENTINEL_FLOAT
 
-    @field_validator('market_value_eur', 'avg_age', mode='before')
+    @field_validator('overall_rating', 'attack_rating', 'midfield_rating', 'defence_rating', mode='before')
     def handle_float_nulls(cls, v: Any) -> Any:
         if v is None or (isinstance(v, float) and math.isnan(v)):
             return SENTINEL_FLOAT
         return float(v)
-
-    @field_validator('squad_size', 'total_caps', 'total_minutes_season', mode='before')
-    def handle_int_nulls(cls, v: Any) -> Any:
-        if v is None or (isinstance(v, float) and math.isnan(v)):
-            return SENTINEL_INT
-        return int(v)
         
-    @field_validator('valuation_date', mode='before')
+    @field_validator('rating_date', mode='before')
     def handle_date_nulls(cls, v: Any) -> Any:
         if v is None:
             return SENTINEL_DATE
