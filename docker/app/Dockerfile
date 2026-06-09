@@ -74,5 +74,5 @@ RUN pip install --no-cache-dir --upgrade pip \
         pytest-cov
 
 # ---- Comando por defecto ----
-# Mantener el contenedor en ejecución (los pipelines se ejecutan bajo demanda)
-CMD ["tail", "-f", "/dev/null"]
+# Iniciar el scheduler de la Fase 7 que gestiona la ingesta y reentrenamiento
+CMD ["python", "-m", "src.scheduler"]

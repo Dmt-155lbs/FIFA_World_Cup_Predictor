@@ -73,6 +73,7 @@ services:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       PYTHONPATH: /app
       ODDS_API_KEY: ${ODDS_API_KEY}
+      WEBHOOK_URL: ${WEBHOOK_URL:-""}
     volumes:
       - ./src:/app/src
       - ./data:/app/data
