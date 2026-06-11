@@ -27,6 +27,7 @@ class WalkForwardEvaluator:
     def evaluate(self, pipeline: Any, full_data: pd.DataFrame, feature_cols: list[str]) -> dict:
         all_predictions = []
         all_actuals = []
+        all_match_ids = []
         fold_metrics = []
 
         for i, split in enumerate(self.splits):
@@ -88,6 +89,10 @@ class WalkForwardEvaluator:
             
             all_predictions.extend(preds_list)
             all_actuals.extend(test_outcome.values)
+            # Propagar el match_id de cada fila de test (si está disponible)
+            # para poder cruzar las predicciones con las cuotas en el backtesting.
+            if 'match_id' in test.columns:
+                all_match_ids.extend(test['match_id'].tolist())
 
         return {
             'fold_metrics': fold_metrics,
@@ -95,5 +100,6 @@ class WalkForwardEvaluator:
             'aggregate_logloss': np.mean([f['log_loss'] for f in fold_metrics]) if fold_metrics else 0,
             'aggregate_accuracy': np.mean([f['accuracy'] for f in fold_metrics]) if fold_metrics else 0,
             'predictions': all_predictions,
-            'actuals': all_actuals
+            'actuals': all_actuals,
+            'match_ids': all_match_ids,
         }

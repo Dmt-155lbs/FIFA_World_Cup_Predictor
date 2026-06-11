@@ -21,7 +21,7 @@ import numpy as np
 import structlog
 import yaml
 
-from config import Settings
+from src.config import Settings
 
 # ── Logger estructurado del módulo ──────────────────────────────────────────
 logger = structlog.get_logger(__name__)

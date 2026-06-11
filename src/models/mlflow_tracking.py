@@ -11,7 +11,7 @@ Autor: Mundial 2026 Team
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+
 from typing import Any
 
 import mlflow
@@ -233,56 +233,49 @@ class ExperimentTracker:
         Args:
             run_id: ID del run de MLflow asociado.
             version_tag: Etiqueta de versión del modelo (ej: 'v2.1.0').
-            metrics: Diccionario de métricas a almacenar como JSON.
+            metrics: Diccionario de métricas del entrenamiento.
             artifact_path: Ruta al artefacto del modelo guardado.
 
         Raises:
             Exception: Si la inserción en BD falla (se hace rollback
                       automáticamente gracias al context manager).
         """
-        timestamp = datetime.now(timezone.utc).isoformat()
-
-        # Serializar métricas como string para almacenamiento
-        metrics_str = str(metrics)
-
         with get_session() as session:
-            # Insertar en ML_EXPERIMENT
-            session.execute(
+            # Insertar en ML_EXPERIMENT y recuperar el ID generado
+            result = session.execute(
                 text(
                     """
-                    INSERT INTO ML_EXPERIMENT
-                    (run_id, experiment_name, run_timestamp, parameters, metrics)
-                    VALUES (:run_id, :experiment_name, :run_timestamp,
-                            :parameters, :metrics)
+                    INSERT INTO [mundial].[ML_EXPERIMENT]
+                    ([experiment_name], [mlflow_run_id])
+                    OUTPUT INSERTED.[experiment_id]
+                    VALUES (:experiment_name, :mlflow_run_id)
                     """
                 ),
                 {
-                    "run_id": run_id,
                     "experiment_name": self.experiment_name,
-                    "run_timestamp": timestamp,
-                    "parameters": "{}",  # Los params ya están en MLflow
-                    "metrics": metrics_str,
+                    "mlflow_run_id": run_id,
                 },
             )
+            experiment_id = result.scalar()
 
-            # Insertar en ML_MODEL_VERSION
+            # Insertar en ML_MODEL_VERSION vinculado al experimento
             session.execute(
                 text(
                     """
-                    INSERT INTO ML_MODEL_VERSION
-                    (run_id, version_tag, created_at, artifact_path,
-                     is_active, metrics_summary)
-                    VALUES (:run_id, :version_tag, :created_at,
-                            :artifact_path, :is_active, :metrics_summary)
+                    INSERT INTO [mundial].[ML_MODEL_VERSION]
+                    ([experiment_id], [version_tag], [brier_score],
+                     [roi_backtest], [log_loss], [artifact_path])
+                    VALUES (:experiment_id, :version_tag, :brier_score,
+                            :roi_backtest, :log_loss, :artifact_path)
                     """
                 ),
                 {
-                    "run_id": run_id,
+                    "experiment_id": experiment_id,
                     "version_tag": version_tag,
-                    "created_at": timestamp,
+                    "brier_score": metrics.get("brier_score", 0.0),
+                    "roi_backtest": metrics.get("roi_backtest", 0.0),
+                    "log_loss": metrics.get("log_loss", 0.0),
                     "artifact_path": artifact_path,
-                    "is_active": True,
-                    "metrics_summary": metrics_str,
                 },
             )
 
@@ -290,5 +283,6 @@ class ExperimentTracker:
             "Resultados registrados en la base de datos",
             run_id=run_id,
             version_tag=version_tag,
+            experiment_id=experiment_id,
             artifact_path=artifact_path,
         )

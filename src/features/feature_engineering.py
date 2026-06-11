@@ -323,19 +323,62 @@ class FeatureEngineer:
         return df
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 5. Codificación de confederaciones (placeholder)
+    # 5. Codificación de confederaciones (one-hot real)
     # ─────────────────────────────────────────────────────────────────────────
+    def _load_team_confederations(self, df: pd.DataFrame) -> dict[int, str]:
+        """
+        Carga el mapeo ``team_id → confederación`` desde ``DIM_TEAM``.
+
+        Se consulta una sola vez por llamada. Si la columna ``home_team_id``
+        no está presente o la BD no es accesible (p. ej. tests en SQLite en
+        memoria sin la tabla), se devuelve un diccionario vacío y la
+        codificación recae en columnas de ceros.
+
+        Parámetros
+        ----------
+        df : pd.DataFrame
+            DataFrame que debería contener ``home_team_id`` / ``away_team_id``.
+
+        Retorna
+        -------
+        dict[int, str]
+            Mapeo de ``team_id`` a su confederación (o vacío si no disponible).
+        """
+        if "home_team_id" not in df.columns and "away_team_id" not in df.columns:
+            return {}
+
+        try:
+            with self._engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        "SELECT [team_id], [confederation] "
+                        "FROM [mundial].[DIM_TEAM]"
+                    )
+                ).fetchall()
+            return {int(r[0]): str(r[1]) for r in rows}
+        except Exception as exc:  # pragma: no cover - depende de la BD
+            logger.warning(
+                "no_se_pudo_cargar_confederaciones",
+                error=str(exc),
+            )
+            return {}
+
     def encode_confederations(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Crea columnas one-hot placeholder para confederaciones home y away.
+        Codifica las confederaciones home y away mediante one-hot encoding.
 
-        La vista ``vw_feature_store`` no incluye confederación directamente,
-        por lo que se crean columnas inicializadas en 0 que pueden poblarse
-        posteriormente vía join con ``DIM_TEAM``.
+        Resuelve la confederación de cada equipo vía ``DIM_TEAM`` (usando
+        ``home_team_id`` / ``away_team_id``) y activa la columna correspondiente
+        para cada partido. Las confederaciones provienen de
+        :data:`CONFEDERATIONS`.
 
-        Columnas generadas:
+        Columnas generadas (todas enteras 0/1):
         - ``home_conf_{confederación}`` para cada confederación
         - ``away_conf_{confederación}`` para cada confederación
+
+        Si la confederación de un equipo no se puede resolver, sus columnas
+        quedan en 0 (categoría "desconocida" implícita), evitando filtración
+        de información.
 
         Parámetros
         ----------
@@ -345,19 +388,39 @@ class FeatureEngineer:
         Retorna
         -------
         pd.DataFrame
-            DataFrame con columnas de confederación placeholder.
+            DataFrame con las columnas one-hot de confederación pobladas.
         """
         df = df.copy()
 
+        # Inicializar todas las columnas en 0
         for conf in CONFEDERATIONS:
             df[f"home_conf_{conf}"] = 0
             df[f"away_conf_{conf}"] = 0
 
-        logger.info(
-            "confederaciones_codificadas",
-            confederaciones=CONFEDERATIONS,
-            columnas_creadas=len(CONFEDERATIONS) * 2,
-        )
+        conf_map = self._load_team_confederations(df)
+
+        if conf_map:
+            home_conf = df["home_team_id"].map(conf_map)
+            away_conf = df["away_team_id"].map(conf_map)
+            for conf in CONFEDERATIONS:
+                df[f"home_conf_{conf}"] = (home_conf == conf).astype(int)
+                df[f"away_conf_{conf}"] = (away_conf == conf).astype(int)
+
+            n_resueltos = int(home_conf.notna().sum())
+            logger.info(
+                "confederaciones_codificadas",
+                confederaciones=CONFEDERATIONS,
+                columnas_creadas=len(CONFEDERATIONS) * 2,
+                equipos_resueltos=n_resueltos,
+                modo="one_hot_real",
+            )
+        else:
+            logger.warning(
+                "confederaciones_sin_resolver",
+                detalle="DIM_TEAM no accesible; columnas inicializadas en 0",
+                columnas_creadas=len(CONFEDERATIONS) * 2,
+            )
+
         return df
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -577,7 +640,7 @@ class FeatureEngineer:
         # ── Paso 4: Codificación de competición ──────────────────────────
         df = self.encode_competition_importance(df)
 
-        # ── Paso 5: Confederaciones (placeholder) ────────────────────────
+        # ── Paso 5: Confederaciones (one-hot real vía DIM_TEAM) ──────────
         df = self.encode_confederations(df)
 
         # ── Paso 6: Features de contexto ─────────────────────────────────

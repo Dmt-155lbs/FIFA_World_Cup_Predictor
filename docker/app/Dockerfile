@@ -41,7 +41,7 @@ WORKDIR /app
 
 # ---- Copiar e instalar dependencias Python ----
 # Se copia primero pyproject.toml para aprovechar la caché de capas de Docker
-COPY ../../pyproject.toml /app/pyproject.toml
+COPY pyproject.toml /app/pyproject.toml
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -e ".[dev]" \

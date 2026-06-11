@@ -61,8 +61,8 @@ services:
   # ---------------------------------------------------------------------------
   app:
     build:
-      context: ./docker/app
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/app/Dockerfile
     container_name: mundial-app
     environment:
       DB_SA_PASSWORD: ${DB_SA_PASSWORD}

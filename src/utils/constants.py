@@ -62,7 +62,7 @@ FEATURE_COLUMNS = [
     'home_rolling_xg', 'away_rolling_xg',
     'home_rolling_xga', 'away_rolling_xga',
     'home_rolling_form', 'away_rolling_form',
-    'home_elo_momentum', 'away_elo_momentum',
+    'home_rolling_elo_momentum', 'away_rolling_elo_momentum',
     # Diferenciales
     'xg_diff', 'form_diff', 'fifa_attack_diff',
     'goals_diff',

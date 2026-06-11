@@ -200,8 +200,7 @@ OUTER APPLY (
         sv.[attack_rating],
         sv.[overall_rating],
         sv.[midfield_rating],
-        sv.[defence_rating],
-        
+        sv.[defence_rating]
     FROM [mundial].[FACT_FIFA_RATING] AS sv
     WHERE sv.[team_id]        = m.[home_team_id]
       AND sv.[valuation_date] <= m.[match_date]
@@ -216,8 +215,7 @@ OUTER APPLY (
         sv.[attack_rating],
         sv.[overall_rating],
         sv.[midfield_rating],
-        sv.[defence_rating],
-        
+        sv.[defence_rating]
     FROM [mundial].[FACT_FIFA_RATING] AS sv
     WHERE sv.[team_id]        = m.[away_team_id]
       AND sv.[valuation_date] <= m.[match_date]

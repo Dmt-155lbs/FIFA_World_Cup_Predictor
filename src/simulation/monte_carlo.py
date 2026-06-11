@@ -19,7 +19,7 @@ from typing import Any
 import numpy as np
 import structlog
 
-from simulation.bracket_engine import BracketEngine
+from src.simulation.bracket_engine import BracketEngine
 
 # ── Logger estructurado del módulo ──────────────────────────────────────────
 logger = structlog.get_logger(__name__)

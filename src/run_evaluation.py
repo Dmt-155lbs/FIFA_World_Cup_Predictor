@@ -1,5 +1,6 @@
 import pandas as pd
 import structlog
+from sqlalchemy import text
 from src.pipeline import PredictionPipeline
 from src.evaluation.walk_forward import WalkForwardEvaluator
 from src.evaluation.financial_backtest import FinancialBacktester
@@ -8,7 +9,52 @@ from src.models.mlflow_tracking import ExperimentTracker
 
 logger = structlog.get_logger(__name__)
 
-def run_offline_evaluation(splits: list[dict], full_data: pd.DataFrame, feature_cols: list[str]):
+
+def load_odds_map(engine) -> dict[int, dict[str, float]]:
+    """Carga las cuotas 1X2 promedio por partido desde FACT_ODDS.
+
+    Promedia las cuotas de todas las casas de apuestas registradas para cada
+    partido (descartando cuotas centinela <= 0).
+
+    Retorna
+    -------
+    dict[int, dict[str, float]]
+        ``{match_id: {'home': cuota, 'draw': cuota, 'away': cuota}}``.
+    """
+    query = text(
+        """
+        SELECT [match_id],
+               AVG([odds_home]) AS home,
+               AVG([odds_draw]) AS draw,
+               AVG([odds_away]) AS away
+        FROM [mundial].[FACT_ODDS]
+        WHERE [odds_home] > 0 AND [odds_draw] > 0 AND [odds_away] > 0
+        GROUP BY [match_id]
+        """
+    )
+    odds_map: dict[int, dict[str, float]] = {}
+    try:
+        with engine.connect() as conn:
+            for row in conn.execute(query):
+                odds_map[int(row.match_id)] = {
+                    "home": float(row.home),
+                    "draw": float(row.draw),
+                    "away": float(row.away),
+                }
+    except Exception as exc:
+        logger.warning("no_se_pudieron_cargar_cuotas", error=str(exc))
+        return {}
+
+    logger.info("Cuotas cargadas para backtesting", partidos_con_cuotas=len(odds_map))
+    return odds_map
+
+
+def run_offline_evaluation(
+    splits: list[dict],
+    full_data: pd.DataFrame,
+    feature_cols: list[str],
+    engine=None,
+):
     """
     Script dedicado para ejecutar la evaluación Walk-Forward y el Backtesting.
     Esto se mantiene separado de pipeline.py porque el Walk-Forward reentrena el modelo
@@ -66,21 +112,167 @@ def run_offline_evaluation(splits: list[dict], full_data: pd.DataFrame, feature_
             f"fold_{fold['fold']}_accuracy": fold['accuracy']
         })
 
-    # 3. (Opcional) Backtesting Financiero si se tienen cuotas
-    # backtester = FinancialBacktester()
-    # odds = ... # Cargar odds del dataset de test global
-    # flat_roi = backtester.flat_stake_roi(wf_results['predictions'], odds, wf_results['actuals'])
-    # kelly_roi = backtester.kelly_criterion_roi(wf_results['predictions'], odds, wf_results['actuals'])
-    # tracker.log_metrics({
-    #     "roi_flat_stake": flat_roi['roi_pct'],
-    #     "roi_kelly": kelly_roi['roi_pct']
-    # })
-    
+    # 3. Backtesting Financiero (Flat Stake + Kelly) sobre las cuotas reales
+    backtest_results = _run_financial_backtest(
+        wf_results=wf_results,
+        engine=engine,
+        tracker=tracker,
+    )
+    if backtest_results:
+        wf_results['backtest'] = backtest_results
+
     tracker.end_run()
     logger.info("Evaluación registrada exitosamente en MLflow.")
-    
+
     return wf_results
 
+
+def _run_financial_backtest(wf_results: dict, engine, tracker) -> dict | None:
+    """Ejecuta el backtesting financiero cruzando predicciones y cuotas.
+
+    Alinea las predicciones del Walk-Forward con las cuotas históricas de
+    ``FACT_ODDS`` mediante el ``match_id``, y calcula el ROI con las
+    estrategias Flat Stake y Kelly fraccionario. Si no hay cuotas disponibles
+    para los partidos evaluados, se omite el backtesting de forma segura.
+    """
+    if engine is None:
+        from src.utils.db import get_engine
+        engine = get_engine()
+
+    odds_map = load_odds_map(engine)
+    match_ids = wf_results.get('match_ids', [])
+    predictions = wf_results.get('predictions', [])
+    actuals = wf_results.get('actuals', [])
+
+    if not odds_map or not match_ids:
+        logger.warning(
+            "Backtesting omitido: sin cuotas o sin match_ids alineables.",
+            cuotas=len(odds_map),
+            match_ids=len(match_ids),
+        )
+        return None
+
+    # Alinear predicción / cuota / resultado real por match_id
+    aligned_preds: list[dict] = []
+    aligned_odds: list[dict] = []
+    aligned_actuals: list[str] = []
+    for mid, pred, actual in zip(match_ids, predictions, actuals):
+        odds = odds_map.get(int(mid)) if mid is not None else None
+        if odds is None:
+            continue
+        aligned_preds.append(pred)
+        aligned_odds.append(odds)
+        aligned_actuals.append(actual)
+
+    if not aligned_odds:
+        logger.warning(
+            "Backtesting omitido: ningún partido de test tiene cuotas."
+        )
+        return None
+
+    logger.info(
+        "Ejecutando backtesting financiero",
+        partidos_alineados=len(aligned_odds),
+    )
+
+    backtester = FinancialBacktester()
+    flat_roi = backtester.flat_stake_roi(aligned_preds, aligned_odds, aligned_actuals)
+    kelly_roi = backtester.kelly_criterion_roi(aligned_preds, aligned_odds, aligned_actuals)
+
+    tracker.log_metrics({
+        "roi_flat_stake_pct": flat_roi['roi_pct'],
+        "flat_total_bets": float(flat_roi['total_bets']),
+        "flat_win_rate": flat_roi['win_rate'],
+        "roi_kelly_pct": kelly_roi['roi_pct'],
+        "kelly_final_bankroll": kelly_roi['final_bankroll'],
+        "kelly_max_drawdown_pct": kelly_roi['max_drawdown'],
+    })
+
+    logger.info(
+        "Backtesting financiero completado",
+        roi_flat_pct=round(flat_roi['roi_pct'], 2),
+        roi_kelly_pct=round(kelly_roi['roi_pct'], 2),
+        apuestas_flat=flat_roi['total_bets'],
+    )
+
+    return {"flat_stake": flat_roi, "kelly": kelly_roi}
+
 if __name__ == "__main__":
-    # Aquí iría el código de inicialización para cargar datos de DB y definir splits
-    pass
+    from src.utils.logging_config import setup_logging
+    from src.utils.db import get_engine
+    from src.features.feature_engineering import FeatureEngineer
+    from src.utils.constants import FEATURE_COLUMNS, TARGET_HOME, TARGET_AWAY
+
+    setup_logging(dev_mode=True)
+    logger.info("Iniciando evaluación offline desde CLI")
+
+    try:
+        # Cargar datos desde el feature store
+        engine = get_engine()
+        fe = FeatureEngineer(engine=engine)
+        full_data = fe.load_feature_store()
+
+        if full_data.empty:
+            logger.error(
+                "No hay datos en el feature store. "
+                "Ejecute la ingesta primero."
+            )
+            raise SystemExit(1)
+
+        # Definir splits temporales para Walk-Forward
+        # Se usa split por año: cada año es un fold
+        full_data = full_data.sort_values('match_date').reset_index(drop=True)
+        years = full_data['match_date'].dt.year.unique()
+
+        splits = []
+        for i, year in enumerate(sorted(years)):
+            if i < 2:  # Necesitamos al menos 2 años de historia
+                continue
+            # Splits por fecha (formato que consume WalkForwardEvaluator):
+            # se entrena con todo lo anterior al año de test y se evalúa
+            # sobre el año completo, sin filtración de información futura.
+            splits.append({
+                'fold': i - 1,
+                'train_end': pd.Timestamp(year=int(year) - 1, month=12, day=31),
+                'test_start': pd.Timestamp(year=int(year), month=1, day=1),
+                'test_end': pd.Timestamp(year=int(year), month=12, day=31),
+                'test_year': int(year),
+            })
+
+        if not splits:
+            logger.error(
+                "No hay suficientes años de datos para Walk-Forward. "
+                "Se requieren al menos 3 años."
+            )
+            raise SystemExit(1)
+
+        logger.info(
+            "Walk-Forward configurado",
+            n_folds=len(splits),
+            años=list(sorted(years)),
+        )
+
+        # Determinar columnas de features disponibles
+        available_features = [
+            col for col in FEATURE_COLUMNS if col in full_data.columns
+        ]
+
+        results = run_offline_evaluation(
+            splits=splits,
+            full_data=full_data,
+            feature_cols=available_features,
+            engine=engine,
+        )
+
+        logger.info(
+            "Evaluación completada",
+            brier=results.get('aggregate_brier', 'N/A'),
+            logloss=results.get('aggregate_logloss', 'N/A'),
+            accuracy=results.get('aggregate_accuracy', 'N/A'),
+        )
+
+    except SystemExit:
+        raise
+    except Exception as e:
+        logger.error("Error fatal en evaluación offline", error=str(e))
+        raise
