@@ -1,43 +1,42 @@
 import plotly.express as px
 import pandas as pd
-import numpy as np
 
-def plot_roi_curves(backtest_results):
+def plot_roi_curves(flat_history: list[float], kelly_history: list[float]):
     """
-    Renderiza las curvas de Profit & Loss del backtest.
+    Renderiza las curvas de Profit & Loss acumuladas del backtest.
+
+    Parameters
+    ----------
+    flat_history : list[float]
+        Evolución del bankroll con la estrategia Flat Stake
+        (``FinancialBacktester.flat_stake_roi(...)['bankroll_history']``).
+    kelly_history : list[float]
+        Evolución del bankroll con Kelly fraccionario
+        (``FinancialBacktester.kelly_criterion_roi(...)['bankroll_history']``).
     """
-    # Simulación de datos para demostración si backtest_results es None
-    if backtest_results is None:
-        dates = pd.date_range(start="2022-11-20", end="2022-12-18")
-        df = pd.DataFrame({
-            'Fecha': dates,
-            'Flat Stake': [1000 + i*5 + np.random.normal(0, 10) for i in range(len(dates))],
-            'Kelly Criterion': [1000 + i*8 + np.random.normal(0, 15) for i in range(len(dates))],
-            'Baseline (Naive)': [1000 - i*2 for i in range(len(dates))]
-        })
-    else:
-        df = pd.DataFrame(backtest_results)
-        
-    # Melt para plotly
-    df_melt = df.melt(id_vars=['Fecha'], var_name='Estrategia', value_name='Bankroll ($)')
-    
+    records = []
+    for i, v in enumerate(flat_history):
+        records.append({"Apuesta": i, "Bankroll": v, "Estrategia": "Flat Stake"})
+    for i, v in enumerate(kelly_history):
+        records.append({"Apuesta": i, "Bankroll": v, "Estrategia": "Kelly Criterion"})
+    df = pd.DataFrame(records)
+
     fig = px.line(
-        df_melt,
-        x='Fecha',
-        y='Bankroll ($)',
-        color='Estrategia',
-        title='Curvas de Profit & Loss Acumuladas',
+        df,
+        x="Apuesta",
+        y="Bankroll",
+        color="Estrategia",
+        title="Curvas de Profit & Loss Acumuladas",
         color_discrete_map={
-            'Flat Stake': '#00b4d8',
-            'Kelly Criterion': '#e94560',
-            'Baseline (Naive)': '#8d99ae'
-        }
+            "Flat Stake": "#00b4d8",
+            "Kelly Criterion": "#e94560",
+        },
     )
-    
+
     fig.update_layout(
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        hovermode="x unified"
+        hovermode="x unified",
     )
-    
+
     return fig

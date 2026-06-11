@@ -73,6 +73,12 @@ RUN pip install --no-cache-dir --upgrade pip \
         pytest \
         pytest-cov
 
+# ---- Entrypoint: inicializa la BD (idempotente) antes del proceso principal ----
+COPY docker/app/entrypoint.sh /app/entrypoint.sh
+# Normalizar terminaciones de línea (por si se editó en Windows) y dar permisos
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
+
 # ---- Comando por defecto ----
 # Iniciar el scheduler de la Fase 7 que gestiona la ingesta y reentrenamiento
 CMD ["python", "-m", "src.scheduler"]

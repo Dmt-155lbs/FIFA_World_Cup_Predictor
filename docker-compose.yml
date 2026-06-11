@@ -74,9 +74,13 @@ services:
       PYTHONPATH: /app
       ODDS_API_KEY: ${ODDS_API_KEY}
       WEBHOOK_URL: ${WEBHOOK_URL:-""}
+      MODEL_PATH: /app/models/best_model
     volumes:
       - ./src:/app/src
       - ./data:/app/data
+      - ./config:/app/config
+      - ./db:/app/db
+      - models_data:/app/models
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -102,10 +106,13 @@ services:
       DB_USER: sa
       MLFLOW_TRACKING_URI: http://mlflow:5000
       PYTHONPATH: /app
+      MODEL_PATH: /app/models/best_model
     ports:
       - "8501:8501"
     volumes:
       - ./src:/app/src
+      - ./config:/app/config
+      - models_data:/app/models:ro
     depends_on:
       app:
         condition: service_started
@@ -120,6 +127,8 @@ volumes:
   sqlserver_data:
     driver: local
   mlflow_artifacts:
+    driver: local
+  models_data:
     driver: local
 
 # =============================================================================

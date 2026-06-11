@@ -30,6 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ---- Instalar dependencias Python ----
+# Incluye las dependencias de inferencia (xgboost, shap, optuna, yaml…) porque
+# el dashboard ejecuta el pipeline real en vivo (predicción + Monte Carlo).
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir \
         streamlit>=1.36 \
@@ -38,11 +40,20 @@ RUN pip install --no-cache-dir --upgrade pip \
         seaborn \
         pandas \
         numpy \
+        scipy \
+        scikit-learn \
         sqlalchemy>=2.0 \
         pyodbc \
         mlflow>=2.14 \
         pydantic>=2.0 \
         pydantic-settings \
+        xgboost>=2.1 \
+        joblib \
+        optuna \
+        shap>=0.45 \
+        structlog \
+        tenacity \
+        pyyaml \
         requests
 
 # ---- Directorio de trabajo ----
