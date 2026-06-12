@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 import structlog
 import os
+import shutil
 import tempfile
 
 from src.config import get_settings
@@ -144,6 +145,7 @@ class PredictionPipeline:
         y_away: Optional[pd.Series] = None,
         optimize_hyperparams: bool = True,
         save_path: str = './models/best_model',
+        persist: bool = True,
     ) -> dict:
         """
         Entrena el modelo XGBoost completo con optimización opcional de
@@ -187,72 +189,116 @@ class PredictionPipeline:
         if best_params:
             self.trainer = XGBoostTrainer(params=best_params)
 
-        # Iniciar tracking en MLflow
-        run_id = self.tracker.start_run(
-            run_name="entrenamiento_ensemble",
-            params=best_params if best_params else self.trainer.params,
-        )
-
-        # Entrenar el modelo
+        # Entrenar el modelo (siempre)
         metrics = self.trainer.train(X, y_home, y_away)
         logger.info("Modelo entrenado.", métricas=metrics)
 
-        # Logear métricas y modelo en MLflow
-        self.tracker.log_metrics(metrics)
-        self.tracker.log_model(self.trainer, "xgboost_ensemble")
-
-        # --- Análisis SHAP y registro de artefactos ---
-        try:
-            logger.info("Iniciando análisis SHAP...")
-            feature_names = list(X.columns)
-            shap_analyzer = SHAPAnalyzer(
-                model_home=self.trainer.model_home,
-                model_away=self.trainer.model_away,
-                feature_names=feature_names,
+        # Persistencia + tracking. Se OMITE durante la evaluación walk-forward
+        # (persist=False): allí se entrena un modelo por fold solo para medir,
+        # y no queremos (a) sobrescribir el modelo de producción en disco,
+        # (b) registrar una versión por fold en la BD, ni (c) abrir un run +
+        # SHAP por fold.
+        if persist:
+            # Iniciar tracking en MLflow
+            run_id = self.tracker.start_run(
+                run_name="entrenamiento_ensemble",
+                params=best_params if best_params else self.trainer.params,
             )
 
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                # Summary plots
-                summary_files = shap_analyzer.plot_summary(X, save_dir=tmp_dir)
-                for f in summary_files:
-                    self.tracker.log_artifact(f, "shap_summary")
+            # Logear métricas y modelo en MLflow
+            self.tracker.log_metrics(metrics)
+            self.tracker.log_model(self.trainer, "xgboost_ensemble")
 
-                # Waterfall plot para un partido de muestra
-                if len(X) > 0:
-                    sample_idx = 0
-                    sample_features = X.iloc[[sample_idx]]
-                    # Obtener nombres de equipos si están disponibles en índices o usar genéricos
-                    home_team = "Local_Sample"
-                    away_team = "Visitante_Sample"
-                    
-                    waterfall_files = shap_analyzer.explain_match(
-                        match_features=sample_features,
-                        team_home=home_team,
-                        team_away=away_team,
-                        save_dir=tmp_dir,
-                    )
-                    for f in waterfall_files:
-                        self.tracker.log_artifact(f, "shap_waterfall")
-            logger.info("Análisis SHAP completado y registrado.")
-        except Exception as e:
-            logger.error("Error durante el análisis SHAP", error=str(e))
+            # --- Análisis SHAP y registro de artefactos ---
+            # El summary y el waterfall se aíslan en bloques try/except
+            # independientes: si uno falla, el otro igual se registra. Se
+            # garantiza además un artefacto con nombre canónico
+            # (shap_summary.png / shap_waterfall.png) que el dashboard busca.
+            try:
+                logger.info("Iniciando análisis SHAP...")
+                feature_names = list(X.columns)
+                shap_analyzer = SHAPAnalyzer(
+                    model_home=self.trainer.model_home,
+                    model_away=self.trainer.model_away,
+                    feature_names=feature_names,
+                )
 
-        self.tracker.end_run()
+                # SHAP sobre TreeExplainer es exacto pero el render del summary
+                # con miles de puntos es costoso; se acota la muestra para
+                # mantener el entrenamiento ágil sin perder representatividad.
+                X_shap = (
+                    X.sample(n=2000, random_state=42) if len(X) > 2000 else X
+                )
 
-        # Guardar modelo en disco
-        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-        self.trainer.save(save_path)
-        logger.info("Modelo guardado.", ruta=save_path)
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    # --- Summary plots (importancia global) ---
+                    try:
+                        summary_files = shap_analyzer.plot_summary(
+                            X_shap, save_dir=tmp_dir
+                        )
+                        # Renombrar el plot del modelo local al nombre canónico
+                        # que consume el dashboard (shap_summary.png) y conservar
+                        # el del visitante como variante.
+                        if summary_files:
+                            canonical = os.path.join(tmp_dir, "shap_summary.png")
+                            shutil.move(summary_files[0], canonical)
+                            summary_files = [canonical] + summary_files[1:]
+                        for f in summary_files:
+                            self.tracker.log_artifact(f, "shap_summary")
+                        logger.info(
+                            "SHAP summary registrado.", archivos=len(summary_files)
+                        )
+                    except Exception as e:
+                        logger.error("Error en SHAP summary", error=str(e))
 
-        # Registrar en la base de datos
-        self.tracker.register_to_db(
-            run_id=run_id,
-            version_tag=f"v{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}",
-            metrics=metrics,
-            artifact_path=save_path,
-        )
+                    # --- Waterfall plot para un partido de muestra ---
+                    try:
+                        if len(X) > 0:
+                            sample_features = X.iloc[[0]]
+                            waterfall_files = shap_analyzer.explain_match(
+                                match_features=sample_features,
+                                team_home="Local_Sample",
+                                team_away="Visitante_Sample",
+                                save_dir=tmp_dir,
+                            )
+                            if waterfall_files:
+                                canonical = os.path.join(
+                                    tmp_dir, "shap_waterfall.png"
+                                )
+                                shutil.move(waterfall_files[0], canonical)
+                                waterfall_files = (
+                                    [canonical] + waterfall_files[1:]
+                                )
+                            for f in waterfall_files:
+                                self.tracker.log_artifact(f, "shap_waterfall")
+                            logger.info(
+                                "SHAP waterfall registrado.",
+                                archivos=len(waterfall_files),
+                            )
+                    except Exception as e:
+                        logger.error("Error en SHAP waterfall", error=str(e))
 
-        # Calibrar rho de Dixon-Coles con los datos de entrenamiento
+                logger.info("Análisis SHAP completado.")
+            except Exception as e:
+                logger.error("Error durante el análisis SHAP", error=str(e))
+
+            self.tracker.end_run()
+
+            # Guardar modelo en disco
+            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+            self.trainer.save(save_path)
+            logger.info("Modelo guardado.", ruta=save_path)
+
+            # Registrar en la base de datos
+            self.tracker.register_to_db(
+                run_id=run_id,
+                version_tag=f"v{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}",
+                metrics=metrics,
+                artifact_path=save_path,
+            )
+
+        # Calibrar rho de Dixon-Coles con los datos de entrenamiento (siempre:
+        # necesario para que las predicciones de cada fold sean válidas).
         self._calibrate_poisson(X, y_home, y_away)
 
         return metrics

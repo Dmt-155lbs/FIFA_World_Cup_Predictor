@@ -13,10 +13,16 @@ from __future__ import annotations
 
 
 # ============================================================================
-# 48 EQUIPOS CLASIFICADOS — MUNDIAL FIFA 2026
+# 48 EQUIPOS CLASIFICADOS — MUNDIAL FIFA 2026 (LISTA OFICIAL)
 # ============================================================================
 # Formato: (team_name, fifa_code, confederation, fifa_ranking)
-# Ranking FIFA actualizado a junio 2026.
+# Esta es la composición OFICIAL de clasificados (no el armado provisional por
+# bombos). Refleja el sorteo final por grupos A–L de bracket_2026.yaml.
+# Selecciones que NO clasificaron y se retiraron del listado anterior:
+#   Italia, Dinamarca, Serbia, Gales, Ucrania (UEFA); Jamaica, Honduras
+#   (CONCACAF); Nigeria, Camerún, Malí (CAF); Indonesia, Trinidad y Tobago.
+# Reemplazadas por los clasificados reales (ver más abajo).
+# El ranking FIFA es aproximado a junio 2026 (solo ordena pots/listas).
 
 WORLD_CUP_2026_TEAMS: list[tuple[str, str, str, int]] = [
     # ── CONMEBOL (6) ──────────────────────────────────────────────────
@@ -35,51 +41,49 @@ WORLD_CUP_2026_TEAMS: list[tuple[str, str, str, int]] = [
     ("Netherlands", "NED", "UEFA", 7),
     ("Belgium", "BEL", "UEFA", 8),
     ("Germany", "GER", "UEFA", 9),
-    ("Italy", "ITA", "UEFA", 10),
     ("Croatia", "CRO", "UEFA", 13),
-    ("Denmark", "DEN", "UEFA", 17),
     ("Switzerland", "SUI", "UEFA", 19),
     ("Austria", "AUT", "UEFA", 22),
-    ("Serbia", "SRB", "UEFA", 33),
-    ("Wales", "WAL", "UEFA", 27),
     ("Turkey", "TUR", "UEFA", 26),
-    ("Ukraine", "UKR", "UEFA", 23),
+    ("Norway", "NOR", "UEFA", 32),          # nuevo: clasificó (grupo con Italia)
+    ("Sweden", "SWE", "UEFA", 38),          # nuevo
+    ("Czech Republic", "CZE", "UEFA", 40),  # nuevo
+    ("Scotland", "SCO", "UEFA", 45),        # nuevo
+    ("Bosnia and Herzegovina", "BIH", "UEFA", 74),  # nuevo
 
     # ── CONCACAF (6 — incluye 3 anfitriones) ──────────────────────────
     ("United States", "USA", "CONCACAF", 14),
     ("Mexico", "MEX", "CONCACAF", 15),
-    ("Canada", "CAN", "CONCACAF", 40),
-    ("Jamaica", "JAM", "CONCACAF", 57),
+    ("Canada", "CAN", "CONCACAF", 41),
     ("Panama", "PAN", "CONCACAF", 44),
-    ("Honduras", "HON", "CONCACAF", 72),
+    ("Haiti", "HAI", "CONCACAF", 83),       # nuevo
+    ("Curacao", "CUW", "CONCACAF", 90),     # nuevo
 
-    # ── AFC (8) ───────────────────────────────────────────────────────
+    # ── AFC (9) ───────────────────────────────────────────────────────
     ("Japan", "JPN", "AFC", 16),
+    ("Iran", "IRN", "AFC", 20),
     ("South Korea", "KOR", "AFC", 21),
     ("Australia", "AUS", "AFC", 24),
-    ("Iran", "IRN", "AFC", 20),
-    ("Saudi Arabia", "KSA", "AFC", 56),
     ("Qatar", "QAT", "AFC", 35),
-    ("Iraq", "IRQ", "AFC", 63),
+    ("Saudi Arabia", "KSA", "AFC", 56),
     ("Uzbekistan", "UZB", "AFC", 62),
+    ("Iraq", "IRQ", "AFC", 63),
+    ("Jordan", "JOR", "AFC", 64),           # nuevo
 
-    # ── CAF (9) ───────────────────────────────────────────────────────
+    # ── CAF (10) ──────────────────────────────────────────────────────
     ("Morocco", "MAR", "CAF", 18),
     ("Senegal", "SEN", "CAF", 20),
-    ("Nigeria", "NGA", "CAF", 28),
+    ("Algeria", "ALG", "CAF", 33),
     ("Egypt", "EGY", "CAF", 36),
-    ("Cameroon", "CMR", "CAF", 46),
-    ("South Africa", "RSA", "CAF", 59),
-    ("Algeria", "ALG", "CAF", 32),
-    ("Mali", "MLI", "CAF", 48),
     ("Ivory Coast", "CIV", "CAF", 39),
+    ("Tunisia", "TUN", "CAF", 41),          # nuevo
+    ("DR Congo", "COD", "CAF", 57),         # nuevo
+    ("South Africa", "RSA", "CAF", 59),
+    ("Cape Verde", "CPV", "CAF", 70),       # nuevo
+    ("Ghana", "GHA", "CAF", 73),            # nuevo
 
     # ── OFC (1) ───────────────────────────────────────────────────────
     ("New Zealand", "NZL", "OFC", 93),
-
-    # ── Repechaje intercontinental (2) ────────────────────────────────
-    ("Indonesia", "IDN", "AFC", 87),
-    ("Trinidad and Tobago", "TRI", "CONCACAF", 103),
 ]
 
 # Verificación de integridad

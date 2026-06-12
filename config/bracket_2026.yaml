@@ -5,7 +5,7 @@
 #            Define composición de grupos, reglas de desempate, mapeo del
 #            bracket eliminatorio y parámetros del modelo de predicción.
 # Autor    : Sistema de Predicción – Mundial FIFA 2026
-# Fecha    : 2026-06-02
+# Fecha    : 2026-06-12
 # =============================================================================
 
 # =============================================================================
@@ -25,12 +25,12 @@ torneo:
 
 # =============================================================================
 # FASE DE GRUPOS
-# Composición de los 12 grupos (A–L) con los 48 equipos clasificados.
-# Al no existir aún el sorteo oficial, los equipos se distribuyen por bombos
-# (pots) según el ranking FIFA: cada grupo recibe un cabeza de serie del
-# Bombo 1 (posición 1), y un equipo de cada bombo restante (posiciones 2–4).
-# Los tres anfitriones (USA, México, Canadá) lideran los grupos A, B y C.
-# Nombres canónicos alineados con src/ingestion/seed_data.WORLD_CUP_2026_TEAMS.
+# Composición OFICIAL de los 12 grupos (A–L) según el sorteo final de la FIFA.
+# La posición 1 corresponde al cabeza de serie de cada grupo (Bombo 1); los
+# tres anfitriones lideran sus grupos: México (A), Canadá (B) y EE.UU. (D).
+# Nombres canónicos en inglés alineados con
+# src/ingestion/seed_data.WORLD_CUP_2026_TEAMS (clave usada por el motor de
+# bracket y por las team_lambdas del modelo).
 # =============================================================================
 fase_de_grupos:
   formato:
@@ -41,65 +41,65 @@ fase_de_grupos:
 
   grupos:
     A:
-      - { posicion: 1, equipo: "United States", fifa_code: "USA" }
-      - { posicion: 2, equipo: "Italy", fifa_code: "ITA" }
-      - { posicion: 3, equipo: "Ukraine", fifa_code: "UKR" }
-      - { posicion: 4, equipo: "Cameroon", fifa_code: "CMR" }
-    B:
       - { posicion: 1, equipo: "Mexico", fifa_code: "MEX" }
-      - { posicion: 2, equipo: "Uruguay", fifa_code: "URU" }
-      - { posicion: 3, equipo: "Australia", fifa_code: "AUS" }
-      - { posicion: 4, equipo: "Mali", fifa_code: "MLI" }
-    C:
+      - { posicion: 2, equipo: "South Africa", fifa_code: "RSA" }
+      - { posicion: 3, equipo: "South Korea", fifa_code: "KOR" }
+      - { posicion: 4, equipo: "Czech Republic", fifa_code: "CZE" }
+    B:
       - { posicion: 1, equipo: "Canada", fifa_code: "CAN" }
-      - { posicion: 2, equipo: "Colombia", fifa_code: "COL" }
-      - { posicion: 3, equipo: "Turkey", fifa_code: "TUR" }
-      - { posicion: 4, equipo: "Paraguay", fifa_code: "PAR" }
-    D:
-      - { posicion: 1, equipo: "Argentina", fifa_code: "ARG" }
-      - { posicion: 2, equipo: "Croatia", fifa_code: "CRO" }
-      - { posicion: 3, equipo: "Wales", fifa_code: "WAL" }
-      - { posicion: 4, equipo: "Saudi Arabia", fifa_code: "KSA" }
-    E:
-      - { posicion: 1, equipo: "France", fifa_code: "FRA" }
-      - { posicion: 2, equipo: "Japan", fifa_code: "JPN" }
-      - { posicion: 3, equipo: "Nigeria", fifa_code: "NGA" }
-      - { posicion: 4, equipo: "Jamaica", fifa_code: "JAM" }
-    F:
-      - { posicion: 1, equipo: "Spain", fifa_code: "ESP" }
-      - { posicion: 2, equipo: "Denmark", fifa_code: "DEN" }
-      - { posicion: 3, equipo: "Ecuador", fifa_code: "ECU" }
-      - { posicion: 4, equipo: "South Africa", fifa_code: "RSA" }
-    G:
-      - { posicion: 1, equipo: "England", fifa_code: "ENG" }
-      - { posicion: 2, equipo: "Morocco", fifa_code: "MAR" }
-      - { posicion: 3, equipo: "Algeria", fifa_code: "ALG" }
-      - { posicion: 4, equipo: "Uzbekistan", fifa_code: "UZB" }
-    H:
-      - { posicion: 1, equipo: "Brazil", fifa_code: "BRA" }
-      - { posicion: 2, equipo: "Switzerland", fifa_code: "SUI" }
-      - { posicion: 3, equipo: "Serbia", fifa_code: "SRB" }
-      - { posicion: 4, equipo: "Iraq", fifa_code: "IRQ" }
-    I:
-      - { posicion: 1, equipo: "Portugal", fifa_code: "POR" }
-      - { posicion: 2, equipo: "Iran", fifa_code: "IRN" }
+      - { posicion: 2, equipo: "Bosnia and Herzegovina", fifa_code: "BIH" }
       - { posicion: 3, equipo: "Qatar", fifa_code: "QAT" }
-      - { posicion: 4, equipo: "Honduras", fifa_code: "HON" }
-    J:
-      - { posicion: 1, equipo: "Netherlands", fifa_code: "NED" }
-      - { posicion: 2, equipo: "Senegal", fifa_code: "SEN" }
-      - { posicion: 3, equipo: "Egypt", fifa_code: "EGY" }
-      - { posicion: 4, equipo: "Indonesia", fifa_code: "IDN" }
-    K:
-      - { posicion: 1, equipo: "Belgium", fifa_code: "BEL" }
-      - { posicion: 2, equipo: "South Korea", fifa_code: "KOR" }
-      - { posicion: 3, equipo: "Ivory Coast", fifa_code: "CIV" }
-      - { posicion: 4, equipo: "New Zealand", fifa_code: "NZL" }
-    L:
+      - { posicion: 4, equipo: "Switzerland", fifa_code: "SUI" }
+    C:
+      - { posicion: 1, equipo: "Brazil", fifa_code: "BRA" }
+      - { posicion: 2, equipo: "Morocco", fifa_code: "MAR" }
+      - { posicion: 3, equipo: "Haiti", fifa_code: "HAI" }
+      - { posicion: 4, equipo: "Scotland", fifa_code: "SCO" }
+    D:
+      - { posicion: 1, equipo: "United States", fifa_code: "USA" }
+      - { posicion: 2, equipo: "Paraguay", fifa_code: "PAR" }
+      - { posicion: 3, equipo: "Australia", fifa_code: "AUS" }
+      - { posicion: 4, equipo: "Turkey", fifa_code: "TUR" }
+    E:
       - { posicion: 1, equipo: "Germany", fifa_code: "GER" }
-      - { posicion: 2, equipo: "Austria", fifa_code: "AUT" }
-      - { posicion: 3, equipo: "Panama", fifa_code: "PAN" }
-      - { posicion: 4, equipo: "Trinidad and Tobago", fifa_code: "TRI" }
+      - { posicion: 2, equipo: "Curacao", fifa_code: "CUW" }
+      - { posicion: 3, equipo: "Ivory Coast", fifa_code: "CIV" }
+      - { posicion: 4, equipo: "Ecuador", fifa_code: "ECU" }
+    F:
+      - { posicion: 1, equipo: "Netherlands", fifa_code: "NED" }
+      - { posicion: 2, equipo: "Japan", fifa_code: "JPN" }
+      - { posicion: 3, equipo: "Sweden", fifa_code: "SWE" }
+      - { posicion: 4, equipo: "Tunisia", fifa_code: "TUN" }
+    G:
+      - { posicion: 1, equipo: "Belgium", fifa_code: "BEL" }
+      - { posicion: 2, equipo: "Egypt", fifa_code: "EGY" }
+      - { posicion: 3, equipo: "Iran", fifa_code: "IRN" }
+      - { posicion: 4, equipo: "New Zealand", fifa_code: "NZL" }
+    H:
+      - { posicion: 1, equipo: "Spain", fifa_code: "ESP" }
+      - { posicion: 2, equipo: "Cape Verde", fifa_code: "CPV" }
+      - { posicion: 3, equipo: "Saudi Arabia", fifa_code: "KSA" }
+      - { posicion: 4, equipo: "Uruguay", fifa_code: "URU" }
+    I:
+      - { posicion: 1, equipo: "France", fifa_code: "FRA" }
+      - { posicion: 2, equipo: "Senegal", fifa_code: "SEN" }
+      - { posicion: 3, equipo: "Iraq", fifa_code: "IRQ" }
+      - { posicion: 4, equipo: "Norway", fifa_code: "NOR" }
+    J:
+      - { posicion: 1, equipo: "Argentina", fifa_code: "ARG" }
+      - { posicion: 2, equipo: "Algeria", fifa_code: "ALG" }
+      - { posicion: 3, equipo: "Austria", fifa_code: "AUT" }
+      - { posicion: 4, equipo: "Jordan", fifa_code: "JOR" }
+    K:
+      - { posicion: 1, equipo: "Portugal", fifa_code: "POR" }
+      - { posicion: 2, equipo: "DR Congo", fifa_code: "COD" }
+      - { posicion: 3, equipo: "Uzbekistan", fifa_code: "UZB" }
+      - { posicion: 4, equipo: "Colombia", fifa_code: "COL" }
+    L:
+      - { posicion: 1, equipo: "England", fifa_code: "ENG" }
+      - { posicion: 2, equipo: "Croatia", fifa_code: "CRO" }
+      - { posicion: 3, equipo: "Ghana", fifa_code: "GHA" }
+      - { posicion: 4, equipo: "Panama", fifa_code: "PAN" }
 
 # =============================================================================
 # REGLAS DE DESEMPATE

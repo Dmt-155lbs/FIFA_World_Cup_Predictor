@@ -63,8 +63,13 @@ class SHAPAnalyzer:
             Tupla (shap_home, shap_away) con los valores SHAP en numpy arrays.
         """
         logger.debug(f"Calculando SHAP values para {len(X)} observaciones")
-        shap_home = self.explainer_home.shap_values(X)
-        shap_away = self.explainer_away.shap_values(X)
+        # check_additivity=False es OBLIGATORIO: los modelos usan el objetivo
+        # 'count:poisson' (link logarítmico), por lo que model.predict() devuelve
+        # exp(margin) mientras que TreeExplainer explica el margin crudo. La
+        # comprobación de aditividad por defecto compara ambos y lanza
+        # "Additivity check failed", abortando todo el análisis SHAP.
+        shap_home = self.explainer_home.shap_values(X, check_additivity=False)
+        shap_away = self.explainer_away.shap_values(X, check_additivity=False)
         return shap_home, shap_away
 
     def plot_summary(
@@ -158,9 +163,11 @@ class SHAPAnalyzer:
         match_idx = match_features.index[0]
 
         # Extraer Explanation objects para el waterfall
-        # explainer() retorna un objeto de tipo shap.Explanation
-        exp_home = self.explainer_home(match_features)
-        exp_away = self.explainer_away(match_features)
+        # explainer() retorna un objeto de tipo shap.Explanation.
+        # check_additivity=False por el mismo motivo que en compute_shap_values:
+        # el link 'count:poisson' rompe la comprobación de aditividad.
+        exp_home = self.explainer_home(match_features, check_additivity=False)
+        exp_away = self.explainer_away(match_features, check_additivity=False)
 
         # --- Waterfall Plot Local ---
         plt.figure(figsize=(10, 6))

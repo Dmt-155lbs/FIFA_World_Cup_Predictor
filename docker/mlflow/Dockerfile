@@ -36,6 +36,16 @@ RUN pip install --no-cache-dir --upgrade pip \
         mlflow>=2.14 \
         pyodbc
 
+# ---- Dependencia de runtime del driver ODBC ----
+# El paso de `apt-get purge --auto-remove` de arriba elimina libgssapi-krb5-2,
+# que el driver msodbcsql18 necesita en runtime. Sin esta librería, pyodbc
+# falla al cargar el driver con un engañoso "file not found"
+# (libmsodbcsql-18.6.so.2.1) y el servidor MLflow no puede conectar a su
+# backend SQL Server. Se reinstala explícitamente para que no sea removible.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
+
 # ---- Crear directorio para artefactos ----
 RUN mkdir -p /mlflow/artifacts
 

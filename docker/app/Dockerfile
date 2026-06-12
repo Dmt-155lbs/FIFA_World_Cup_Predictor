@@ -68,10 +68,19 @@ RUN pip install --no-cache-dir --upgrade pip \
         requests \
         pyyaml \
         apscheduler \
+        typer \
         properscoring \
         soccerdata>=1.3 \
         pytest \
         pytest-cov
+
+# ---- Dependencia runtime del driver ODBC (Kerberos GSSAPI) ----
+# El driver msodbcsql18 enlaza con libgssapi_krb5.so.2; el `apt-get purge
+# --auto-remove` anterior la elimina (era dependencia transitiva de curl/gnupg2).
+# Sin ella unixODBC falla con "Can't open lib ... file not found". La
+# reinstalamos en una capa propia para no invalidar la caché de pip.
+RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
 
 # ---- Entrypoint: inicializa la BD (idempotente) antes del proceso principal ----
 COPY docker/app/entrypoint.sh /app/entrypoint.sh

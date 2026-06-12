@@ -77,7 +77,12 @@ class ExperimentTracker:
         Returns:
             ID único del run iniciado (run_id).
         """
-        active_run = mlflow.start_run(run_name=run_name)
+        # Si ya hay un run activo (p. ej. la evaluación walk-forward abre un run
+        # "paraguas" y luego entrena un modelo por fold, donde cada train inicia
+        # su propio run), iniciamos uno ANIDADO en lugar de fallar con
+        # "Run already active".
+        nested = mlflow.active_run() is not None
+        active_run = mlflow.start_run(run_name=run_name, nested=nested)
         self._active_run_id = active_run.info.run_id
 
         if params is not None:

@@ -29,16 +29,46 @@ class EloScraper(BaseScraper):
 
     _USER_AGENT = "Mozilla/5.0 (compatible; MundialBot/1.0)"
 
-    # Mapeo de nombres alternativos → nombre canónico FIFA
-    _NAME_NORMALIZATION: dict[str, str] = {
-        "USA": "United States",
-        "Korea Republic": "South Korea",
-        "Korea DPR": "North Korea",
-        "IR Iran": "Iran",
-        "Côte d'Ivoire": "Ivory Coast",
-        "Türkiye": "Turkey",
-        "Czechia": "Czech Republic",
-        "Chinese Taipei": "Taiwan",
+    # ------------------------------------------------------------------ #
+    # Mapeo de los códigos de 2 letras de eloratings.net → nombre canónico
+    # FIFA usado en DIM_TEAM/seed_data. eloratings expone World.tsv con la
+    # selección identificada por un código de 2 letras (mayormente ISO
+    # 3166-1 alpha-2, con excepciones para las "home nations" británicas:
+    # EN=England, WA=Wales, SC=Scotland, NI=Northern Ireland).
+    # Sin este mapeo el código (p. ej. "ES") nunca casa con DIM_TEAM y la
+    # tabla FACT_ELO_HISTORY queda vacía.
+    # Se cubren los 48 del Mundial + algunas selecciones frecuentes.
+    # ------------------------------------------------------------------ #
+    _ELO_CODE_TO_NAME: dict[str, str] = {
+        # CONMEBOL
+        "AR": "Argentina", "BR": "Brazil", "UY": "Uruguay",
+        "CO": "Colombia", "EC": "Ecuador", "PY": "Paraguay",
+        "CL": "Chile", "PE": "Peru", "VE": "Venezuela", "BO": "Bolivia",
+        # UEFA
+        "FR": "France", "ES": "Spain", "EN": "England", "PT": "Portugal",
+        "NL": "Netherlands", "BE": "Belgium", "DE": "Germany", "IT": "Italy",
+        "HR": "Croatia", "DK": "Denmark", "CH": "Switzerland", "AT": "Austria",
+        "RS": "Serbia", "WA": "Wales", "TR": "Turkey", "UA": "Ukraine",
+        "PL": "Poland", "SE": "Sweden", "NO": "Norway", "CZ": "Czech Republic",
+        "SC": "Scotland", "BA": "Bosnia and Herzegovina",
+        "HU": "Hungary", "RO": "Romania", "GR": "Greece",
+        # CONCACAF
+        "US": "United States", "MX": "Mexico", "CA": "Canada",
+        "JM": "Jamaica", "PA": "Panama", "HN": "Honduras",
+        "CR": "Costa Rica", "TT": "Trinidad and Tobago",
+        "HT": "Haiti", "CW": "Curacao",
+        # AFC
+        "JP": "Japan", "KR": "South Korea", "AU": "Australia", "IR": "Iran",
+        "SA": "Saudi Arabia", "QA": "Qatar", "IQ": "Iraq", "UZ": "Uzbekistan",
+        "ID": "Indonesia", "CN": "China", "AE": "United Arab Emirates",
+        "JO": "Jordan",
+        # CAF
+        "MA": "Morocco", "SN": "Senegal", "NG": "Nigeria", "EG": "Egypt",
+        "CM": "Cameroon", "ZA": "South Africa", "DZ": "Algeria", "ML": "Mali",
+        "CI": "Ivory Coast", "TN": "Tunisia", "GH": "Ghana",
+        "CV": "Cape Verde", "CD": "DR Congo",
+        # OFC
+        "NZ": "New Zealand",
     }
 
     def _fetch(self, date: str | None = None) -> pd.DataFrame:
@@ -81,12 +111,17 @@ class EloScraper(BaseScraper):
         )
         df["rating_date"] = rating_date
 
-        # Normalizar nombres de equipos
-        df["team"] = df["team"].replace(self._NAME_NORMALIZATION)
+        # Traducir el código de 2 letras de eloratings → nombre canónico FIFA.
+        # Las selecciones fuera del mapeo (no relevantes para el Mundial) se
+        # descartan: su código no casaría con DIM_TEAM de todos modos.
+        df["team"] = df["team"].str.strip().str.upper().map(self._ELO_CODE_TO_NAME)
+        antes = len(df)
+        df = df.dropna(subset=["team"]).reset_index(drop=True)
 
         logger.info(
             "Ratings Elo descargados",
-            equipos=len(df),
+            equipos_mapeados=len(df),
+            equipos_totales=antes,
             fecha=str(rating_date),
         )
 
@@ -136,18 +171,21 @@ class EloScraper(BaseScraper):
             logger.error("Error parseando TSV", error=str(e))
             raise
 
-        # Identificar columnas por contenido
-        # Estructura típica: Rank | Team | Elo | Delta | ...
+        # Identificar columnas por contenido.
+        # Estructura REAL de World.tsv (verificada): la fila es
+        #   rank | rank2 | código_2_letras | elo | <muchas columnas más>
+        # es decir el código de equipo está en el índice 2 y el Elo en el 3.
+        # (El parser anterior asumía team=idx1/elo=idx2, lo que tomaba un
+        #  número como nombre y el código como Elo → todo se descartaba.)
         if len(df.columns) >= 4:
-            # Columnas: rank, team, elo, delta, ...
             result = pd.DataFrame({
-                "team": df.iloc[:, 1].astype(str).str.strip(),
+                "team": df.iloc[:, 2].astype(str).str.strip(),
                 "elo_rating": pd.to_numeric(
-                    df.iloc[:, 2], errors="coerce"
-                ),
-                "elo_delta": pd.to_numeric(
                     df.iloc[:, 3], errors="coerce"
                 ),
+                # No hay una columna de delta limpia y estable en el TSV;
+                # no es crítica para el feature store, se deja en 0.
+                "elo_delta": 0.0,
             })
         elif len(df.columns) == 3:
             result = pd.DataFrame({

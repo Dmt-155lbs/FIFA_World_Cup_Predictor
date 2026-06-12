@@ -26,8 +26,25 @@ if (-not (Test-Path ".env")) {
 Write-Host "==> Levantando servicios (docker compose up -d --build)" -ForegroundColor Cyan
 docker compose up -d --build
 
-Write-Host "==> Esperando a que la base de datos esté lista…" -ForegroundColor Cyan
-docker compose exec -T app python -c "import time; from src.utils.db import test_connection; [time.sleep(3) for _ in range(20) if not test_connection()]; print('DB lista' if test_connection() else 'DB no respondió')"
+Write-Host "==> Esperando a que la BD esté inicializada y sembrada (db_init + 48 equipos)…" -ForegroundColor Cyan
+# No basta con que la conexión responda: el entrypoint corre db_init (schema +
+# seed) de forma asíncrona respecto a `up -d`. Esperamos a que DIM_TEAM tenga
+# los 48 equipos para no lanzar la ingesta antes de tiempo (evita que todos los
+# partidos se descarten por equipos aún no sembrados).
+docker compose exec -T app python -c @"
+import time
+ok = False
+for _ in range(40):
+    try:
+        from src.ingestion.loader import DataLoader
+        if DataLoader().get_table_counts().get('DIM_TEAM', 0) >= 48:
+            ok = True
+            break
+    except Exception:
+        pass
+    time.sleep(3)
+print('BD lista (48 equipos sembrados)' if ok else 'TIMEOUT esperando db_init/seed')
+"@
 
 if (-not $SkipIngest) {
     Write-Host "==> Ingesta de datos (ingest --source all)" -ForegroundColor Cyan

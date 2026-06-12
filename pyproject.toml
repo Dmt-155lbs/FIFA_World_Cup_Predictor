@@ -7,7 +7,7 @@
 
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "mundial-predictor"
@@ -64,6 +64,9 @@ dependencies = [
     "requests",
     "pyyaml",
     "apscheduler",
+
+    # CLI (orquestador / punto de entrada)
+    "typer",
 
     # Métricas probabilísticas
     "properscoring",

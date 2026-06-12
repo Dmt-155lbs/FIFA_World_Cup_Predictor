@@ -93,42 +93,46 @@ def ingest(
     loader = DataLoader()
     typer.secho(f"🚀 Iniciando ingesta desde {year} para source={source}", fg=typer.colors.BLUE)
 
-    try:
-        if source in ["elo", "all"]:
-            typer.secho("Descargando Elo Ratings...", fg=typer.colors.CYAN)
-            elo = EloScraper()
-            df_elo = elo.fetch_with_retry()
-            res = loader.load_elo_history(df_elo)
-            typer.secho(f"Elo: Insertados={res['inserted']}, Skipped={res['skipped']}, Errores={res['errors']}", fg=typer.colors.GREEN)
+    # Cada fuente se ejecuta de forma AISLADA: si una falla (rate-limit, cambio
+    # de HTML, falta de credenciales, etc.) se registra y se continúa con las
+    # demás, en lugar de abortar toda la ingesta. Así `--source all` siempre
+    # carga lo que esté disponible.
+    def _run_source(name: str, scraper_factory, load_fn) -> bool:
+        if source not in [name, "all"]:
+            return True
+        typer.secho(f"➡️  Fuente '{name}'...", fg=typer.colors.CYAN)
+        try:
+            df = scraper_factory().fetch_with_retry()
+            res = load_fn(df)
+            typer.secho(
+                f"{name}: Insertados={res['inserted']}, "
+                f"Skipped={res['skipped']}, Errores={res['errors']}",
+                fg=typer.colors.GREEN,
+            )
+            return True
+        except Exception as e:
+            logger.warning("Fuente de ingesta fallida", fuente=name, error=str(e))
+            typer.secho(
+                f"⚠️  Fuente '{name}' omitida ({type(e).__name__}: {e}). Continuando.",
+                fg=typer.colors.YELLOW,
+            )
+            return False
 
-        if source in ["fbref", "all"]:
-            typer.secho("Descargando resultados FBref... (esto puede tardar)", fg=typer.colors.CYAN)
-            fbref = FBrefScraper()
-            # fbref_scraper typically has leagues/seasons in its specific kwargs, but we use defaults for now
-            df_fbref = fbref.fetch_with_retry()
-            res = loader.load_matches(df_fbref)
-            typer.secho(f"Partidos: Insertados={res['inserted']}, Skipped={res['skipped']}, Errores={res['errors']}", fg=typer.colors.GREEN)
+    results_ok = [
+        _run_source("elo", EloScraper, loader.load_elo_history),
+        _run_source("fbref", FBrefScraper, loader.load_matches),
+        _run_source("fifa", SoFIFAScraper, loader.load_fifa_ratings),
+        _run_source("odds", OddsScraperLive, loader.load_odds),
+    ]
 
-        if source in ["fifa", "all"]:
-            typer.secho("Descargando ratings FIFA (SoFIFA)...", fg=typer.colors.CYAN)
-            sofifa = SoFIFAScraper()
-            df_fifa = sofifa.fetch_with_retry()
-            res = loader.load_fifa_ratings(df_fifa)
-            typer.secho(f"FIFA: Insertados={res['inserted']}, Skipped={res['skipped']}, Errores={res['errors']}", fg=typer.colors.GREEN)
-
-        if source in ["odds", "all"]:
-            typer.secho("Descargando Odds en vivo...", fg=typer.colors.CYAN)
-            odds = OddsScraperLive()
-            df_odds = odds.fetch_with_retry()
-            res = loader.load_odds(df_odds)
-            typer.secho(f"Odds: Insertados={res['inserted']}, Skipped={res['skipped']}, Errores={res['errors']}", fg=typer.colors.GREEN)
-
-        typer.secho("✅ Ingesta completada.", fg=typer.colors.GREEN)
-
-    except Exception as e:
-        logger.error("Error durante ingesta", error=str(e))
-        typer.secho(f"❌ Error durante ingesta: {e}", fg=typer.colors.RED)
-        raise typer.Exit(code=1)
+    if all(results_ok):
+        typer.secho("✅ Ingesta completada (todas las fuentes).", fg=typer.colors.GREEN)
+    else:
+        typer.secho(
+            "✅ Ingesta finalizada con fuentes parciales "
+            "(ver advertencias arriba).",
+            fg=typer.colors.GREEN,
+        )
 
 
 @app.command("train")

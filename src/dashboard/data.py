@@ -112,11 +112,16 @@ def model_available() -> bool:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def list_teams() -> list[str]:
-    """Lista de equipos (nombre canónico) ordenada por ranking FIFA.
+    """Los 48 equipos del Mundial 2026 (nombre canónico) ordenados por ranking FIFA.
 
-    Lee de ``DIM_TEAM``; si la BD no responde, cae en los 48 equipos del
-    seed estático para que los selectores nunca queden vacíos.
+    Lee de ``DIM_TEAM`` pero filtra a los 48 clasificados: la tabla también
+    contiene selecciones históricas (Italia, Ucrania, etc.) que existen sólo
+    como datos de entrenamiento de ``FACT_MATCH`` y NO deben aparecer en los
+    selectores del torneo. Si la BD no responde, cae en el seed estático.
     """
+    from src.ingestion.seed_data import WORLD_CUP_2026_TEAMS
+
+    wc_teams = {t[0] for t in WORLD_CUP_2026_TEAMS}
     try:
         with get_engine().connect() as conn:
             rows = conn.execute(
@@ -125,13 +130,11 @@ def list_teams() -> list[str]:
                     "ORDER BY [fifa_ranking]"
                 )
             ).fetchall()
-        names = [r[0] for r in rows]
+        names = [r[0] for r in rows if r[0] in wc_teams]
         if names:
             return names
     except Exception:
         pass
-
-    from src.ingestion.seed_data import WORLD_CUP_2026_TEAMS
 
     # Orden por ranking del seed
     return [t[0] for t in sorted(WORLD_CUP_2026_TEAMS, key=lambda x: x[3])]

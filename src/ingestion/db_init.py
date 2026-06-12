@@ -15,12 +15,44 @@ from __future__ import annotations
 from pathlib import Path
 
 import structlog
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
 from src.config import get_settings
 from src.utils.db import get_engine
 
 log = structlog.get_logger(__name__)
+
+
+def _get_bootstrap_engine():
+    """Crea un engine de *bootstrap* conectado a la base ``master``.
+
+    En un SQL Server recién levantado la base ``mundial`` todavía no existe,
+    por lo que conectar directamente a ella (como hace ``get_engine``) falla.
+    Los scripts de inicialización **crean** ``mundial``/``mlflow`` y luego
+    cambian de contexto con ``USE [mundial]``; para que ``CREATE DATABASE`` sea
+    válido y el cambio de contexto persista entre batches, la conexión debe:
+
+    1. Apuntar a ``master`` (que siempre existe).
+    2. Estar en modo ``AUTOCOMMIT`` (``CREATE DATABASE`` no se permite dentro
+       de una transacción multi-sentencia).
+
+    Si la cadena de conexión no es de SQL Server (p. ej. SQLite en pruebas),
+    se devuelve el engine estándar.
+    """
+    settings = get_settings()
+    cs = settings.effective_connection_string
+
+    if not cs.startswith("mssql"):
+        # Fallback (SQLite u otros): no aplica el problema master/mundial.
+        return get_engine()
+
+    # Reemplazar la base de destino por ``master`` preservando el resto.
+    master_cs = cs.replace(f"/{settings.db_name}?", "/master?", 1)
+    return create_engine(
+        master_cs,
+        isolation_level="AUTOCOMMIT",
+        pool_pre_ping=True,
+    )
 
 # Orden determinista de ejecución
 SQL_SCRIPTS_ORDER: list[str] = [
@@ -99,7 +131,9 @@ def run_sql_scripts(
     if scripts is None:
         scripts = SQL_SCRIPTS_ORDER
 
-    engine = get_engine()
+    # Engine de bootstrap: conecta a ``master`` en AUTOCOMMIT para poder crear
+    # las bases ``mundial``/``mlflow`` antes de que existan.
+    engine = _get_bootstrap_engine()
     results: dict[str, str] = {}
 
     log.info(
@@ -137,7 +171,7 @@ def run_sql_scripts(
                         # Algunos batches pueden fallar si las tablas ya
                         # existen (IF NOT EXISTS los maneja, pero USE/CREATE
                         # DATABASE puede fallar en contextos restringidos).
-                        log.debug(
+                        log.warning(
                             "Batch ignorado",
                             script=script_name,
                             batch=i + 1,

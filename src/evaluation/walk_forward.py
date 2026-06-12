@@ -47,8 +47,15 @@ class WalkForwardEvaluator:
             y_train_home = train['home_goals']
             y_train_away = train['away_goals']
 
-            # Entrenar en ventana histórica
-            pipeline.train(X=X_train, y_home=y_train_home, y_away=y_train_away, optimize_hyperparams=False)
+            # Entrenar en ventana histórica (persist=False: no sobrescribe el
+            # modelo de producción ni registra versiones/SHAP por fold)
+            pipeline.train(
+                X=X_train,
+                y_home=y_train_home,
+                y_away=y_train_away,
+                optimize_hyperparams=False,
+                persist=False,
+            )
 
             preds_list = []
             for idx, row in test.iterrows():

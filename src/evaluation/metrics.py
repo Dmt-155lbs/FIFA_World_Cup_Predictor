@@ -15,7 +15,12 @@ def compute_brier_score(y_true_dummies: pd.DataFrame, y_pred_probs: pd.DataFrame
     """
     brier_sum = 0.0
     for col in ['home', 'draw', 'away']:
-        brier_sum += np.mean((y_pred_probs[col] - y_true_dummies[col])**2)
+        # .values fuerza la resta posicional: los dos DataFrames pueden llegar
+        # con índices distintos (preds con RangeIndex, dummies con el índice
+        # original del test), y restar Series desalineadas produciría NaN.
+        brier_sum += np.mean(
+            (y_pred_probs[col].values - y_true_dummies[col].values) ** 2
+        )
     return brier_sum / 3.0
 
 def compute_log_loss(y_true: pd.Series, y_pred_probs: pd.DataFrame) -> float:

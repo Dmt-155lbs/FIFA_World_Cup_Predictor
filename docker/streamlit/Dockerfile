@@ -56,6 +56,11 @@ RUN pip install --no-cache-dir --upgrade pip \
         pyyaml \
         requests
 
+# ---- Dependencia runtime del driver ODBC (Kerberos GSSAPI) ----
+# Necesaria para que msodbcsql18 cargue (la purga --auto-remove la elimina).
+RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
+
 # ---- Directorio de trabajo ----
 WORKDIR /app
 

@@ -23,8 +23,23 @@ fi
 echo "==> Levantando servicios (docker compose up -d --build)"
 docker compose up -d --build
 
-echo "==> Esperando a que la base de datos esté lista…"
-docker compose exec -T app python -c "import time; from src.utils.db import test_connection; [time.sleep(3) for _ in range(20) if not test_connection()]; print('DB lista' if test_connection() else 'DB no respondio')"
+echo "==> Esperando a que la BD esté inicializada y sembrada (db_init + 48 equipos)…"
+# No basta con la conexión: el entrypoint corre db_init (schema + seed) de forma
+# asíncrona respecto a `up -d`. Esperamos a que DIM_TEAM tenga los 48 equipos.
+docker compose exec -T app python -c '
+import time
+ok = False
+for _ in range(40):
+    try:
+        from src.ingestion.loader import DataLoader
+        if DataLoader().get_table_counts().get("DIM_TEAM", 0) >= 48:
+            ok = True
+            break
+    except Exception:
+        pass
+    time.sleep(3)
+print("BD lista (48 equipos sembrados)" if ok else "TIMEOUT esperando db_init/seed")
+'
 
 if [ "${SKIP_INGEST:-0}" != "1" ]; then
     echo "==> Ingesta de datos (ingest --source all)"
