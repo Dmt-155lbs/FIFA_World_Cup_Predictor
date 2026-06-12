@@ -199,9 +199,15 @@ class PredictionPipeline:
         # (b) registrar una versión por fold en la BD, ni (c) abrir un run +
         # SHAP por fold.
         if persist:
+            # Etiqueta de versión única (timestamp). Se usa COMO nombre del run
+            # de MLflow para que cada entrenamiento sea identificable en la UI
+            # (antes todos se llamaban "entrenamiento_ensemble" y eran
+            # indistinguibles) y como version_tag en ML_MODEL_VERSION.
+            version_tag = f"v{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}"
+
             # Iniciar tracking en MLflow
             run_id = self.tracker.start_run(
-                run_name="entrenamiento_ensemble",
+                run_name=f"train_{version_tag}",
                 params=best_params if best_params else self.trainer.params,
             )
 
@@ -292,7 +298,7 @@ class PredictionPipeline:
             # Registrar en la base de datos
             self.tracker.register_to_db(
                 run_id=run_id,
-                version_tag=f"v{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}",
+                version_tag=version_tag,
                 metrics=metrics,
                 artifact_path=save_path,
             )

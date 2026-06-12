@@ -291,3 +291,52 @@ class ExperimentTracker:
             experiment_id=experiment_id,
             artifact_path=artifact_path,
         )
+
+    def update_latest_model_metrics(
+        self,
+        brier_score: float,
+        log_loss: float,
+        roi_backtest: float = 0.0,
+    ) -> None:
+        """Completa la última versión de modelo con las métricas de evaluación.
+
+        ``train()`` inserta la fila de ``ML_MODEL_VERSION`` con brier/log_loss/ROI
+        en 0.0 porque esas métricas NO existen en el entrenamiento (solo la
+        log-verosimilitud de Poisson). La evaluación walk-forward (``evaluate``)
+        sí las calcula, así que aquí actualizamos la fila más reciente para que
+        el dashboard de Backtesting muestre los valores reales en lugar de cero.
+
+        Args:
+            brier_score: Brier score agregado del walk-forward.
+            log_loss: Log-loss agregado del walk-forward.
+            roi_backtest: ROI (%) del backtesting financiero (0.0 si no hubo
+                          cuotas alineables).
+        """
+        with get_session() as session:
+            updated = session.execute(
+                text(
+                    """
+                    UPDATE [mundial].[ML_MODEL_VERSION]
+                    SET [brier_score] = :brier,
+                        [log_loss]    = :log_loss,
+                        [roi_backtest] = :roi
+                    WHERE [model_version_id] = (
+                        SELECT MAX([model_version_id])
+                        FROM [mundial].[ML_MODEL_VERSION]
+                    )
+                    """
+                ),
+                {
+                    "brier": float(brier_score),
+                    "log_loss": float(log_loss),
+                    "roi": float(roi_backtest),
+                },
+            ).rowcount
+
+        log.info(
+            "Métricas de evaluación escritas en ML_MODEL_VERSION",
+            filas_actualizadas=updated,
+            brier_score=brier_score,
+            log_loss=log_loss,
+            roi_backtest=roi_backtest,
+        )

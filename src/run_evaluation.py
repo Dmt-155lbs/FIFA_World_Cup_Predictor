@@ -118,8 +118,21 @@ def run_offline_evaluation(
         engine=engine,
         tracker=tracker,
     )
+    roi_backtest = 0.0
     if backtest_results:
         wf_results['backtest'] = backtest_results
+        roi_backtest = backtest_results['flat_stake']['roi_pct']
+
+    # 4. Persistir las métricas REALES en ML_MODEL_VERSION para el dashboard.
+    # train() insertó la fila con brier/log_loss/ROI = 0.0 (esas métricas no se
+    # producen durante el entrenamiento); aquí completamos la versión más
+    # reciente con los valores del walk-forward, de modo que el dashboard de
+    # Backtesting deje de mostrar ceros.
+    tracker.update_latest_model_metrics(
+        brier_score=wf_results['aggregate_brier'],
+        log_loss=wf_results['aggregate_logloss'],
+        roi_backtest=roi_backtest,
+    )
 
     tracker.end_run()
     logger.info("Evaluación registrada exitosamente en MLflow.")
