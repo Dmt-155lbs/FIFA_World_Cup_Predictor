@@ -687,22 +687,87 @@ class DataLoader:
         log.info("Carga de xG completada", **result)
         return result
 
+    def _create_upcoming_match(
+        self,
+        match_date: date,
+        home_team_id: int,
+        away_team_id: int,
+        competition_id: int,
+    ) -> int | None:
+        """Inserta un FIXTURE FUTURO (no jugado) en FACT_MATCH y devuelve su id.
+
+        Las cuotas en vivo de The Odds API son de partidos que **aún no se han
+        disputado**, por lo que no existe la fila correspondiente en
+        ``FACT_MATCH`` a la que enlazar la cuota. Aquí creamos esa fila marcada
+        con ``is_played = 0``: los goles 0-0 son sólo un placeholder y la vista
+        ``vw_feature_store`` la excluye del entrenamiento (filtra
+        ``is_played = 1``), de modo que el fixture futuro alimenta los Value
+        Bets sin contaminar el modelo.
+
+        Returns
+        -------
+        int | None
+            ``match_id`` del fixture creado, o ``None`` si la inserción falló.
+        """
+        try:
+            with get_session() as session:
+                session.execute(
+                    text(
+                        """
+                        INSERT INTO [mundial].[FACT_MATCH]
+                        ([competition_id], [match_date], [home_team_id],
+                         [away_team_id], [home_goals], [away_goals], [venue],
+                         [is_neutral], [is_knockout], [attendance], [is_played])
+                        VALUES (:comp, :dt, :home, :away, 0, 0, 'UPCOMING',
+                                1, 0, -1, 0)
+                        """
+                    ),
+                    {
+                        "comp": competition_id,
+                        "dt": match_date,
+                        "home": home_team_id,
+                        "away": away_team_id,
+                    },
+                )
+            return self.resolve_match_id(match_date, home_team_id, away_team_id)
+        except Exception as exc:
+            log.warning(
+                "No se pudo crear el fixture futuro",
+                home=home_team_id,
+                away=away_team_id,
+                fecha=str(match_date),
+                error=str(exc),
+            )
+            return None
+
     def load_odds(self, df: pd.DataFrame) -> dict[str, int]:
-        """Carga cuotas de apuestas a FACT_ODDS.
+        """Carga cuotas de apuestas a FACT_ODDS (con upsert de cuotas en vivo).
+
+        A diferencia de las demás tablas FACT, las cuotas provienen del feed EN
+        VIVO de The Odds API y corresponden a partidos FUTUROS del Mundial. Si
+        el partido todavía no existe en ``FACT_MATCH`` se crea automáticamente
+        como fixture no jugado (``is_played = 0``) para poder enlazar la cuota
+        y alimentar los Value Bets del dashboard. Como las cuotas cambian con el
+        tiempo, si ya existe una cuota para ``(match_id, bookmaker)`` se
+        **actualiza** en lugar de omitirse.
 
         Parameters
         ----------
         df : pd.DataFrame
-            DataFrame con: ``home_team``, ``away_team``, ``match_date``,
-            ``bookmaker``, ``odds_home``, ``odds_draw``, ``odds_away``.
-            Opcionalmente: ``odds_over25``.
+            DataFrame con: ``home_team``, ``away_team``, ``match_date`` (o
+            ``date``), ``bookmaker``, ``odds_home``, ``odds_draw``,
+            ``odds_away``. Opcionalmente: ``odds_over25``.
 
         Returns
         -------
         dict[str, int]
             ``{"inserted": N, "skipped": M, "errors": E}``.
         """
-        inserted = skipped = errors = 0
+        inserted = updated = skipped = errors = 0
+        created_fixtures = 0
+
+        # Las cuotas en vivo son de partidos del Mundial 2026 (fase final).
+        wc_comp_id = self.resolve_competition_id("FIFA World Cup", "2026")
 
         for idx, row in df.iterrows():
             try:
@@ -717,13 +782,32 @@ class DataLoader:
                     skipped += 1
                     continue
 
-                match_id = self.resolve_match_id(
-                    row.get("match_date"), home_id, away_id
+                # El feed en vivo produce la columna ``date``; los datos
+                # históricos usan ``match_date``. Aceptamos ambas.
+                raw_date = row.get("match_date", row.get("date"))
+                match_dt: date | None = None
+                if raw_date is not None and not pd.isna(raw_date):
+                    match_dt = pd.to_datetime(raw_date).date()
+
+                match_id = (
+                    self.resolve_match_id(match_dt, home_id, away_id)
+                    if match_dt is not None
+                    else None
                 )
 
+                # Fixture futuro inexistente → crearlo (is_played = 0) para
+                # poder enlazar la cuota. Requiere fecha y la competición WC.
                 if match_id is None:
-                    skipped += 1
-                    continue
+                    if match_dt is None or wc_comp_id is None:
+                        skipped += 1
+                        continue
+                    match_id = self._create_upcoming_match(
+                        match_dt, home_id, away_id, wc_comp_id
+                    )
+                    if match_id is None:
+                        skipped += 1
+                        continue
+                    created_fixtures += 1
 
                 bookmaker = str(row.get("bookmaker", "UNKNOWN"))
 
@@ -736,7 +820,8 @@ class DataLoader:
                     odds_over25=row.get("odds_over25", 0.0),
                 )
 
-                # Idempotencia: una cuota por partido + bookmaker
+                # Upsert: una cuota por (partido, bookmaker). Si ya existe se
+                # refresca con los valores en vivo más recientes.
                 with self._engine.connect() as conn:
                     existing = conn.execute(
                         text(
@@ -748,31 +833,59 @@ class DataLoader:
                         {"mid": match_id, "bk": bookmaker},
                     ).scalar()
 
-                if existing is not None:
-                    skipped += 1
-                    continue
-
+                data = validated.to_db_dict()
                 with get_session() as session:
-                    session.execute(
-                        text(
-                            """
-                            INSERT INTO [mundial].[FACT_ODDS]
-                            ([match_id], [bookmaker], [odds_home],
-                             [odds_draw], [odds_away], [odds_over25])
-                            VALUES (:match_id, :bookmaker, :odds_home,
-                                    :odds_draw, :odds_away, :odds_over25)
-                            """
-                        ),
-                        validated.to_db_dict(),
-                    )
-                inserted += 1
+                    if existing is not None:
+                        session.execute(
+                            text(
+                                """
+                                UPDATE [mundial].[FACT_ODDS]
+                                SET [odds_home]   = :odds_home,
+                                    [odds_draw]   = :odds_draw,
+                                    [odds_away]   = :odds_away,
+                                    [odds_over25] = :odds_over25,
+                                    [scraped_at]  = SYSUTCDATETIME()
+                                WHERE [odds_id] = :odds_id
+                                """
+                            ),
+                            {**data, "odds_id": existing},
+                        )
+                        updated += 1
+                    else:
+                        session.execute(
+                            text(
+                                """
+                                INSERT INTO [mundial].[FACT_ODDS]
+                                ([match_id], [bookmaker], [odds_home],
+                                 [odds_draw], [odds_away], [odds_over25])
+                                VALUES (:match_id, :bookmaker, :odds_home,
+                                        :odds_draw, :odds_away, :odds_over25)
+                                """
+                            ),
+                            data,
+                        )
+                        inserted += 1
 
             except Exception as e:
                 log.warning("Error cargando odds", fila=idx, error=str(e))
                 errors += 1
 
-        result = {"inserted": inserted, "skipped": skipped, "errors": errors}
-        log.info("Carga de odds completada", **result)
+        # ``skipped`` agrega también las cuotas refrescadas para mantener la
+        # firma {inserted, skipped, errors} que consume el CLI; el detalle real
+        # va al log estructurado.
+        result = {
+            "inserted": inserted,
+            "skipped": skipped + updated,
+            "errors": errors,
+        }
+        log.info(
+            "Carga de odds completada",
+            inserted=inserted,
+            updated=updated,
+            skipped=skipped,
+            errors=errors,
+            fixtures_futuros_creados=created_fixtures,
+        )
         return result
 
     # ================================================================== #

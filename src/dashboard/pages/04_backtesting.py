@@ -43,26 +43,66 @@ else:
 
 st.divider()
 
-st.subheader("Próximas Oportunidades (Value Bets)")
+st.subheader("🎯 Apuestas de Valor Actuales")
 st.markdown(
-    "Partidos próximos donde el Expected Value (EV) estimado por el modelo "
-    "supera el 5% respecto a las cuotas de las casas de apuestas."
+    "Para los **partidos que se vienen** del Mundial, cruzamos la probabilidad "
+    "del modelo contra las cuotas reales de las casas de apuestas (feed en vivo "
+    "de The Odds API). Se marca *value bet* cada selección cuyo **Expected "
+    "Value** — `EV = Prob. Modelo × Cuota − 1` — supera el umbral elegido: ahí "
+    "el modelo estima más probabilidad de la que el mercado está pagando."
 )
 
-value_bets = get_value_bets(ev_threshold=0.05)
+ev_pct = st.slider(
+    "Umbral mínimo de EV", min_value=0, max_value=20, value=5, step=1,
+    format="%d%%",
+    help="Sólo se listan apuestas cuyo Expected Value supera este porcentaje.",
+)
+
+value_bets = get_value_bets(ev_threshold=ev_pct / 100.0)
+
+c1, c2 = st.columns([1, 3])
+c1.metric("Value bets detectadas", len(value_bets))
+c2.caption(
+    "Comparativa por selección: **Prob. Modelo** (lo que cree el modelo) vs "
+    "**Prob. Casa** (probabilidad implícita del mercado, ya descontado el "
+    "margen de la casa). Si Modelo > Casa lo suficiente, hay valor."
+)
+
 if value_bets.empty:
     st.info(
-        "No hay value bets disponibles. Esto ocurre si no hay cuotas de "
-        "partidos futuros en `FACT_ODDS` (ejecuta `mundial-cli ingest "
-        "--source odds`) o si el modelo no detecta ventaja > 5%."
+        "No hay value bets por encima del umbral. Esto ocurre si todavía no "
+        "hay cuotas de partidos futuros en `FACT_ODDS` (ejecuta `mundial-cli "
+        "ingest --source odds` para traer el feed en vivo) o si el modelo no "
+        "detecta ventaja sobre el mercado en los fixtures actuales."
     )
 else:
-    st.dataframe(value_bets, use_container_width=True, hide_index=True)
+    st.dataframe(
+        value_bets,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "EV": st.column_config.TextColumn(
+                "EV", help="Expected Value = Prob. Modelo × Cuota − 1"
+            ),
+            "Cuota": st.column_config.NumberColumn("Cuota", format="%.2f"),
+        },
+    )
+    st.caption(
+        "⚠️ **Fiabilidad** = `Baja` cuando una de las selecciones tiene poco o "
+        "ningún historial internacional en el dataset (12 de los 48: Curazao, "
+        "Cabo Verde, Jordania, RD Congo…). Para esos equipos el modelo recae en "
+        "un prior de *equipo promedio*, lo que **infla** su probabilidad y el EV "
+        "(de ahí EVs de +100%/+600% que NO son ventajas reales). Confía en las "
+        "filas de fiabilidad `Alta`. El EV positivo es esperanza matemática "
+        "sobre la cuota, no una garantía; las apuestas conllevan riesgo."
+    )
 
 st.divider()
 
 st.caption(
-    "ℹ️ Las curvas de P&L (Flat Stake vs Kelly) se generan durante la "
-    "evaluación offline (`run_evaluation`) y se registran como artefactos en "
-    "MLflow junto con el ROI agregado mostrado arriba."
+    "ℹ️ Las métricas de arriba (Brier / Log Loss) provienen de la evaluación "
+    "walk-forward sobre partidos **ya jugados**. El ROI del backtest histórico "
+    "requiere cuotas históricas (plan de pago de The Odds API); esta sección de "
+    "Value Bets es el cruce modelo-vs-mercado sobre los partidos **futuros**, la "
+    "vía para la que está construido el predictor."
 )

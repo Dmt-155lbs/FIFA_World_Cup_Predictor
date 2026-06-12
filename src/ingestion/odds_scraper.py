@@ -12,16 +12,23 @@ from src.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
+# The Odds API devuelve nombres en inglés común. Los normalizamos a los
+# nombres CANÓNICOS de DIM_TEAM (ver src/ingestion/seed_data.py). Sólo se
+# remapean las variantes que difieren; el resto coincide tal cual y
+# resolve_team_id las resuelve (exacta o case-insensitive). Mapear a una
+# variante inexistente (p. ej. "Korea Republic", "IR Iran") haría que el
+# fixture se descartara silenciosamente al no encontrar el team_id.
 TEAM_NAME_MAPPING = {
     "USA": "United States",
-    "South Korea": "Korea Republic",
-    "North Korea": "Korea DPR",
-    "Iran": "IR Iran",
-    "Ivory Coast": "Côte d'Ivoire",
-    "Cape Verde": "Cabo Verde",
-    "DR Congo": "Congo DR",
-    "Republic of Ireland": "Republic of Ireland",
-    "Bosnia and Herzegovina": "Bosnia and Herzegovina"
+    "United States of America": "United States",
+    "Korea Republic": "South Korea",
+    "Côte d'Ivoire": "Ivory Coast",
+    "Cabo Verde": "Cape Verde",
+    "Congo DR": "DR Congo",
+    "Czechia": "Czech Republic",
+    "Türkiye": "Turkey",
+    "Turkiye": "Turkey",
+    "Curaçao": "Curacao",
 }
 
 def normalize_team_name(name: str) -> str:

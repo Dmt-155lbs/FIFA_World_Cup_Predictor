@@ -280,22 +280,49 @@ def run_simulation(n_simulations: int = 10000) -> Optional[dict[str, Any]]:
 # ============================================================================ #
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner="Cruzando el modelo con las casas de apuestas…")
 def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
     """Detecta value bets en partidos próximos cruzando cuotas y modelo.
 
-    Lee las cuotas de ``FACT_ODDS`` de partidos con fecha futura, calcula la
-    probabilidad del modelo para cada cruce y devuelve aquellos con
-    Expected Value (EV) por encima del umbral.
+    Lee las cuotas de ``FACT_ODDS`` de partidos FUTUROS (fixtures con
+    ``is_played = 0`` cargados desde el feed en vivo de The Odds API), calcula
+    la probabilidad del modelo para cada cruce y devuelve las selecciones cuyo
+    Expected Value (EV = p_modelo · cuota − 1) supera el umbral. El EV se
+    calcula con la cuota decimal real de las casas; ``Prob. Casa`` muestra la
+    probabilidad implícita del mercado sin el margen (de-vig) para comparar de
+    forma justa contra la del modelo.
+
+    Cada fila incluye una columna ``Fiabilidad``: es ``Baja`` cuando alguno de
+    los dos equipos no tiene historial internacional en el feature store y el
+    modelo recae en un prior de "equipo promedio" (lo que infla la probabilidad
+    de las selecciones pequeñas y, por tanto, su EV). Las apuestas de alta
+    fiabilidad se muestran primero.
 
     Retorna un DataFrame (posiblemente vacío) con columnas:
-    ``Partido, Pick, Cuota, Prob Modelo, EV``.
+    ``Fecha, Partido, Pick, Cuota, Prob. Modelo, Prob. Casa, EV, Fiabilidad``,
+    ordenado por fiabilidad y luego EV descendente.
     """
-    cols = ["Partido", "Pick", "Cuota", "Prob Modelo", "EV"]
+    cols = [
+        "Fecha", "Partido", "Pick", "Cuota",
+        "Prob. Modelo", "Prob. Casa", "EV", "Fiabilidad",
+    ]
+
+    # Equipos con snapshot REAL (historial de partidos). Si un equipo no está
+    # aquí, build_match_features usa el baseline promedio → predicción poco
+    # fiable para esa selección. Se usa para marcar la fiabilidad de cada bet.
+    known_teams: set[str] = set()
+    builder = get_lambda_builder()
+    if builder is not None:
+        try:
+            builder._prepare()
+            known_teams = set(builder._snapshots.keys())
+        except Exception:
+            known_teams = set()
     query = text(
         """
         SELECT ht.[team_name]  AS home_team,
                at.[team_name]  AS away_team,
+               MIN(m.[match_date]) AS match_date,
                AVG(o.[odds_home]) AS odds_home,
                AVG(o.[odds_draw]) AS odds_draw,
                AVG(o.[odds_away]) AS odds_away
@@ -310,7 +337,10 @@ def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
     )
     try:
         with get_engine().connect() as conn:
-            fixtures = pd.read_sql(query, conn, params={"today": date.today()})
+            fixtures = pd.read_sql(
+                query, conn, params={"today": date.today()},
+                parse_dates=["match_date"],
+            )
     except Exception:
         return pd.DataFrame(columns=cols)
 
@@ -329,10 +359,27 @@ def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
             "away": pred["prob_away"],
         }
         odds = {
-            "home": fx["odds_home"],
-            "draw": fx["odds_draw"],
-            "away": fx["odds_away"],
+            "home": float(fx["odds_home"]),
+            "draw": float(fx["odds_draw"]),
+            "away": float(fx["odds_away"]),
         }
+        # Probabilidad implícita del mercado sin margen (de-vig): normaliza
+        # 1/cuota por la suma de las tres para descontar el overround.
+        inv = {k: 1.0 / v for k, v in odds.items() if v > 0}
+        overround = sum(inv.values()) or 1.0
+        market_probs = {k: inv.get(k, 0.0) / overround for k in odds}
+
+        fecha = (
+            fx["match_date"].strftime("%d %b")
+            if pd.notna(fx["match_date"]) else "—"
+        )
+        # Fiabilidad: baja si algún equipo carece de historial real.
+        reliable = (
+            (not known_teams)  # builder no disponible → no penalizar
+            or (fx["home_team"] in known_teams and fx["away_team"] in known_teams)
+        )
+        fiabilidad = "Alta" if reliable else "Baja ⚠️"
+
         for outcome in ("home", "draw", "away"):
             ev = model_probs[outcome] * odds[outcome] - 1.0
             if ev > ev_threshold:
@@ -340,14 +387,26 @@ def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
                     fx["away_team"] if outcome == "away" else "Empate"
                 )
                 rows.append({
+                    "Fecha": fecha,
                     "Partido": f"{fx['home_team']} vs {fx['away_team']}",
-                    "Pick": f"{label[outcome]}" if outcome == "draw" else pick,
-                    "Cuota": round(float(odds[outcome]), 2),
-                    "Prob Modelo": f"{model_probs[outcome]:.1%}",
+                    "Pick": label[outcome] if outcome == "draw" else pick,
+                    "Cuota": round(odds[outcome], 2),
+                    "Prob. Modelo": f"{model_probs[outcome]:.1%}",
+                    "Prob. Casa": f"{market_probs[outcome]:.1%}",
                     "EV": f"+{ev:.1%}",
+                    "Fiabilidad": fiabilidad,
+                    "_ev": ev,
+                    "_reliable": reliable,
                 })
 
-    return pd.DataFrame(rows, columns=cols)
+    if not rows:
+        return pd.DataFrame(columns=cols)
+
+    # Las apuestas de alta fiabilidad primero; dentro de cada grupo, mayor EV.
+    out = pd.DataFrame(rows).sort_values(
+        ["_reliable", "_ev"], ascending=[False, False]
+    )
+    return out[cols].reset_index(drop=True)
 
 
 # ============================================================================ #

@@ -122,6 +122,34 @@ END
 GO
 
 -- ============================================================================
+-- COLUMNA: mundial.FACT_MATCH.is_played  (añadida de forma idempotente)
+-- Descripción: Distingue partidos YA JUGADOS (1) de FIXTURES FUTUROS (0).
+--              Los fixtures futuros se insertan al ingerir cuotas en vivo
+--              (sección "Value Bets" del dashboard) para poder enlazar la
+--              cuota a un match_id. Sus goles 0-0 son sólo un placeholder y
+--              NO deben contaminar el entrenamiento: la vista
+--              vw_feature_store filtra estrictamente is_played = 1. No se usa
+--              "goles = 0-0" como discriminador porque un 0-0 real es un
+--              empate histórico legítimo y válido para el modelo.
+-- ============================================================================
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'mundial.FACT_MATCH')
+      AND name = N'is_played'
+)
+BEGIN
+    ALTER TABLE [mundial].[FACT_MATCH]
+        ADD [is_played] BIT NOT NULL
+            CONSTRAINT [DF_MATCH_IS_PLAYED] DEFAULT 1;
+    PRINT '✔ Columna [is_played] añadida a FACT_MATCH (default 1 = jugado).';
+END
+ELSE
+BEGIN
+    PRINT 'ℹ La columna [is_played] ya existe en FACT_MATCH.';
+END
+GO
+
+-- ============================================================================
 -- TABLA: mundial.FACT_ELO_HISTORY
 -- Descripción: Historial de ratings Elo de cada selección a lo largo del
 --              tiempo. Permite calcular tendencias y deltas para el modelo

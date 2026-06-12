@@ -220,7 +220,16 @@ OUTER APPLY (
     WHERE sv.[team_id]        = m.[away_team_id]
       AND sv.[valuation_date] <= m.[match_date]
     ORDER BY sv.[valuation_date] DESC
-) AS sva;
+) AS sva
+
+-- ====================================================================
+-- Filtro de integridad: SÓLO partidos jugados entran al feature store.
+-- Los fixtures futuros (is_played = 0, insertados al ingerir cuotas en
+-- vivo para los Value Bets) se excluyen para no contaminar el
+-- entrenamiento ni los snapshots del TeamLambdaBuilder con marcadores
+-- 0-0 placeholder de partidos que aún no se disputan.
+-- ====================================================================
+WHERE m.[is_played] = 1;
 GO
 
 PRINT '✔ Vista [mundial].[vw_feature_store] creada exitosamente.';
