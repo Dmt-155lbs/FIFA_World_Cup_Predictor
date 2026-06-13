@@ -38,6 +38,73 @@ class XGBoostTrainer:
         model_away: Modelo entrenado para goles del equipo visitante.
     """
 
+    # ====================================================================== #
+    #  CONSTRAINTS MONÓTONAS (candado lógico futbolístico)                     #
+    # ====================================================================== #
+    # Fuerzan que el modelo respete la dirección causal de cada feature de
+    # fuerza, impidiendo que la "regresión a la media" de los árboles + la
+    # dominancia de fifa_attack_diff inflen las probabilidades del underdog.
+    #
+    # Hay DOS modelos y las direcciones SE ESPEJAN entre ellos:
+    #   - GOLES LOCALES  ↑ con fuerza/ataque LOCAL  y ↓ con fuerza/defensa VISITANTE.
+    #   - GOLES VISITANTE ↑ con fuerza/ataque VISITANTE y ↓ con fuerza/defensa LOCAL.
+    # Convención XGBoost: +1 = monótona creciente, -1 = decreciente, 0/omitido = sin
+    # restricción. Las features de contexto/categóricas (confederación, descanso,
+    # asistencia, competition_weight) quedan SIN restringir: no tienen una
+    # dirección causal clara sobre los goles. Las de ataque sólo restringen el
+    # marcador PROPIO; las de defensa, el marcador del RIVAL; overall/elo (calidad
+    # global) restringen ambos lados (propio +, rival -).
+
+    # Restricciones para el modelo de GOLES LOCALES.
+    _MONOTONE_HOME: dict[str, int] = {
+        # Calidad global (sube goles propios)
+        "home_elo": +1, "away_elo": -1, "elo_diff": +1,
+        "home_fifa_overall": +1, "away_fifa_overall": -1,
+        "home_fifa_overall_copy": +1, "away_fifa_overall_copy": -1,
+        # Ataque local → más goles locales; defensa visitante → menos goles locales
+        "home_fifa_attack": +1, "away_fifa_defence": -1,
+        "home_fifa_midfield": +1,
+        # xG del partido / forma reciente (local marca, visitante encaja)
+        "home_xg": +1, "away_xga": +1, "home_npxg": +1,
+        "home_rolling_goals_scored": +1, "away_rolling_goals_conceded": +1,
+        "home_rolling_xg": +1, "away_rolling_xga": +1,
+        "home_rolling_form": +1, "home_rolling_elo_momentum": +1,
+        # Diferenciales (home − away): a favor del local
+        "xg_diff": +1, "form_diff": +1, "fifa_attack_diff": +1, "goals_diff": +1,
+    }
+
+    # Restricciones para el modelo de GOLES VISITANTES (espejo del anterior).
+    _MONOTONE_AWAY: dict[str, int] = {
+        "home_elo": -1, "away_elo": +1, "elo_diff": -1,
+        "home_fifa_overall": -1, "away_fifa_overall": +1,
+        "home_fifa_overall_copy": -1, "away_fifa_overall_copy": +1,
+        "away_fifa_attack": +1, "home_fifa_defence": -1,
+        "away_fifa_midfield": +1,
+        "away_xg": +1, "home_xga": +1, "away_npxg": +1,
+        "away_rolling_goals_scored": +1, "home_rolling_goals_conceded": +1,
+        "away_rolling_xg": +1, "home_rolling_xga": +1,
+        "away_rolling_form": +1, "away_rolling_elo_momentum": +1,
+        "xg_diff": -1, "form_diff": -1, "fifa_attack_diff": -1, "goals_diff": -1,
+    }
+
+    @classmethod
+    def monotone_constraints(
+        cls, feature_names: list[str], side: str
+    ) -> dict[str, int]:
+        """Construye el dict de constraints para un modelo, filtrado a las
+        columnas realmente presentes (XGBoost exige nombres existentes).
+
+        Parameters
+        ----------
+        feature_names : list[str]
+            Columnas del DataFrame de entrenamiento.
+        side : str
+            ``"home"`` o ``"away"``.
+        """
+        spec = cls._MONOTONE_HOME if side == "home" else cls._MONOTONE_AWAY
+        cols = set(feature_names)
+        return {f: c for f, c in spec.items() if f in cols}
+
     # Parámetros por defecto optimizados para predicción de goles
     _DEFAULT_PARAMS: dict[str, Any] = {
         "tree_method": "hist",           # Solo CPU
@@ -136,8 +203,26 @@ class XGBoostTrainer:
             eval_fraction=eval_fraction,
         )
 
+        # --- Constraints monótonas por modelo (candado lógico) ---
+        # Base sin monotone_constraints (se inyecta distinto por modelo).
+        base_params = {
+            k: v for k, v in self.params.items() if k != "monotone_constraints"
+        }
+        feat_names = list(X.columns)
+        cons_home = self.monotone_constraints(feat_names, "home")
+        cons_away = self.monotone_constraints(feat_names, "away")
+        log.info(
+            "Constraints monótonas aplicadas",
+            n_home=len(cons_home),
+            n_away=len(cons_away),
+        )
+
         # --- Entrenamiento del modelo local ---
-        self.model_home = XGBRegressor(**self.params, early_stopping_rounds=50)
+        self.model_home = XGBRegressor(
+            **base_params,
+            monotone_constraints=cons_home,
+            early_stopping_rounds=50,
+        )
         self.model_home.fit(
             X_train,
             y_home_train,
@@ -146,7 +231,11 @@ class XGBoostTrainer:
         )
 
         # --- Entrenamiento del modelo visitante ---
-        self.model_away = XGBRegressor(**self.params, early_stopping_rounds=50)
+        self.model_away = XGBRegressor(
+            **base_params,
+            monotone_constraints=cons_away,
+            early_stopping_rounds=50,
+        )
         self.model_away.fit(
             X_train,
             y_away_train,

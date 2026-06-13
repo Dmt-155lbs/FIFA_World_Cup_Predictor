@@ -22,6 +22,7 @@ from sklearn.model_selection import TimeSeriesSplit
 from xgboost import XGBRegressor
 
 from src.config import get_settings
+from src.models.xgboost_trainer import XGBoostTrainer
 
 log = structlog.get_logger(__name__)
 
@@ -121,6 +122,12 @@ class OptunaOptimizer:
             "gamma": trial.suggest_float("gamma", 1e-8, 5.0, log=True),
         }
 
+        # Constraints monótonas: se optimizan los hiperparámetros para el MISMO
+        # modelo restringido que se entrenará en producción (coherencia).
+        feat_names = list(X.columns)
+        cons_home = XGBoostTrainer.monotone_constraints(feat_names, "home")
+        cons_away = XGBoostTrainer.monotone_constraints(feat_names, "away")
+
         # --- Validación cruzada temporal ---
         tscv = TimeSeriesSplit(n_splits=5)
         deviances: list[float] = []
@@ -132,8 +139,8 @@ class OptunaOptimizer:
             y_away_train = y_away.iloc[train_idx]
             y_away_val = y_away.iloc[val_idx]
 
-            # Modelo local
-            model_home = XGBRegressor(**params)
+            # Modelo local (con candado lógico monótono)
+            model_home = XGBRegressor(**params, monotone_constraints=cons_home)
             model_home.fit(
                 X_train,
                 y_home_train,
@@ -141,8 +148,8 @@ class OptunaOptimizer:
                 verbose=False,
             )
 
-            # Modelo visitante
-            model_away = XGBRegressor(**params)
+            # Modelo visitante (espejo de las constraints)
+            model_away = XGBRegressor(**params, monotone_constraints=cons_away)
             model_away.fit(
                 X_train,
                 y_away_train,
