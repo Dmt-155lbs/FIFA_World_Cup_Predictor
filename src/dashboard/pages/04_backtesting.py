@@ -6,6 +6,7 @@ import streamlit as st
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from dashboard.data import (  # noqa: E402
     db_available,
+    get_calibrator,
     get_latest_metrics,
     get_value_bets,
 )
@@ -49,7 +50,10 @@ st.markdown(
     "del modelo contra las cuotas reales de las casas de apuestas (feed en vivo "
     "de The Odds API). Se marca *value bet* cada selección cuyo **Expected "
     "Value** — `EV = Prob. Modelo × Cuota − 1` — supera el umbral elegido: ahí "
-    "el modelo estima más probabilidad de la que el mercado está pagando."
+    "el modelo estima más probabilidad de la que el mercado está pagando. "
+    "La `Prob. Modelo` está **calibrada** (Platt/sigmoid ajustado con los "
+    "resultados históricos out-of-fold) para suavizar el optimismo del Poisson "
+    "con los underdogs; las λ crudas de la simulación Monte Carlo no se tocan."
 )
 
 ev_pct = st.slider(
@@ -57,6 +61,14 @@ ev_pct = st.slider(
     format="%d%%",
     help="Sólo se listan apuestas cuyo Expected Value supera este porcentaje.",
 )
+
+if get_calibrator() is not None:
+    st.caption("🟢 Probabilidades **calibradas** (Platt/sigmoid) activas para el EV.")
+else:
+    st.caption(
+        "🟡 Calibrador no encontrado: se usan probabilidades crudas. Ejecuta "
+        "`mundial-cli evaluate` para generarlo."
+    )
 
 value_bets = get_value_bets(ev_threshold=ev_pct / 100.0)
 

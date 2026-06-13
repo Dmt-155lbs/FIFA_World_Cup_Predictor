@@ -32,6 +32,11 @@ logger = logging.getLogger(__name__)
 # Ruta del modelo serializado (compartida con el contenedor `app` vía volumen)
 MODEL_PATH = os.getenv("MODEL_PATH", "./models/best_model")
 
+# Calibrador de probabilidades 1X2, persistido por `run_evaluation` junto al
+# modelo. El dashboard lo usa para calcular el EV de los Value Bets con
+# probabilidades CALIBRADAS (las λ crudas no se tocan).
+CALIBRATOR_PATH = os.path.join(os.path.dirname(MODEL_PATH) or ".", "calibrator.pkl")
+
 
 # ============================================================================ #
 #  RECURSOS CACHEADOS (engine, pipeline, builder)                              #
@@ -81,6 +86,26 @@ def get_lambda_builder():
         )
     except Exception as exc:  # pragma: no cover
         logger.warning("No se pudo crear el TeamLambdaBuilder: %s", exc)
+        return None
+
+
+@st.cache_resource(show_spinner=False)
+def get_calibrator():
+    """Carga el calibrador de probabilidades 1X2 persistido por la evaluación.
+
+    Devuelve ``None`` si aún no se ha generado (ejecutar ``mundial-cli
+    evaluate``) o si no se puede cargar, en cuyo caso el dashboard cae con
+    elegancia a las probabilidades crudas.
+    """
+    if not os.path.exists(CALIBRATOR_PATH):
+        return None
+    try:
+        from src.models.probability_calibrator import ProbabilityCalibrator
+
+        calib = ProbabilityCalibrator.load(CALIBRATOR_PATH)
+        return calib if calib.fitted else None
+    except Exception as exc:  # pragma: no cover
+        logger.warning("No se pudo cargar el calibrador: %s", exc)
         return None
 
 
@@ -287,10 +312,12 @@ def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
     Lee las cuotas de ``FACT_ODDS`` de partidos FUTUROS (fixtures con
     ``is_played = 0`` cargados desde el feed en vivo de The Odds API), calcula
     la probabilidad del modelo para cada cruce y devuelve las selecciones cuyo
-    Expected Value (EV = p_modelo · cuota − 1) supera el umbral. El EV se
-    calcula con la cuota decimal real de las casas; ``Prob. Casa`` muestra la
-    probabilidad implícita del mercado sin el margen (de-vig) para comparar de
-    forma justa contra la del modelo.
+    Expected Value (EV = p_modelo · cuota − 1) supera el umbral. ``Prob. Modelo``
+    es la probabilidad **CALIBRADA** (si existe el calibrador persistido por la
+    evaluación; corrige el optimismo del Poisson con los underdogs) y el EV se
+    calcula con ella. El EV usa la cuota decimal real de las casas; ``Prob. Casa``
+    muestra la probabilidad implícita del mercado sin el margen (de-vig) para
+    comparar de forma justa contra la del modelo.
 
     Cada fila incluye una columna ``Fiabilidad`` (``Alta``/``Baja``) con dos
     guardias: (1) alguno de los equipos no tiene historial real (tras cargar los
@@ -320,6 +347,11 @@ def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
             known_teams = set(builder._snapshots.keys())
         except Exception:
             known_teams = set()
+
+    # Calibrador de probabilidades: si está disponible, el EV se calcula con las
+    # probabilidades CALIBRADAS (suavizan el optimismo del modelo con underdogs).
+    calibrator = get_calibrator()
+
     query = text(
         """
         SELECT ht.[team_name]  AS home_team,
@@ -355,11 +387,20 @@ def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
         pred = predict_match(fx["home_team"], fx["away_team"])
         if pred is None:
             continue
-        model_probs = {
-            "home": pred["prob_home"],
-            "draw": pred["prob_draw"],
-            "away": pred["prob_away"],
-        }
+        # Probabilidades del modelo: CALIBRADAS si hay calibrador, crudas si no.
+        # (Las λ crudas de pred siguen disponibles para otras páginas; aquí solo
+        # transformamos las probabilidades 1X2 usadas para el EV financiero.)
+        if calibrator is not None:
+            ch, cd, ca = calibrator.predict_one(
+                pred["prob_home"], pred["prob_draw"], pred["prob_away"]
+            )
+            model_probs = {"home": ch, "draw": cd, "away": ca}
+        else:
+            model_probs = {
+                "home": pred["prob_home"],
+                "draw": pred["prob_draw"],
+                "away": pred["prob_away"],
+            }
         odds = {
             "home": float(fx["odds_home"]),
             "draw": float(fx["odds_draw"]),
