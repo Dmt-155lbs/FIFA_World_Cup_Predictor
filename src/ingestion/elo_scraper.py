@@ -29,6 +29,15 @@ class EloScraper(BaseScraper):
 
     _USER_AGENT = "Mozilla/5.0 (compatible; MundialBot/1.0)"
 
+    # Fecha de valoración del snapshot Elo. CLAVE: eloratings.net sólo expone el
+    # Elo ACTUAL (un snapshot), pero la vista vw_feature_store aplica el Elo con
+    # ``rating_date <= match_date``. Si se fechara HOY, ningún partido histórico
+    # (2014–2026) heredaría Elo y la feature quedaría muerta (≈0 en todas las
+    # filas), dejando al modelo sin su mejor señal de fuerza → optimismo ciego
+    # con los underdogs. Igual que SoFIFA, se fija TEMPRANO para que el Elo
+    # actual sirva de proxy estático de fuerza en TODOS los partidos.
+    SNAPSHOT_DATE = date(2014, 1, 1)
+
     # ------------------------------------------------------------------ #
     # Mapeo de los códigos de 2 letras de eloratings.net → nombre canónico
     # FIFA usado en DIM_TEAM/seed_data. eloratings expone World.tsv con la
@@ -103,11 +112,13 @@ class EloScraper(BaseScraper):
         raw_text = response.text
         df = self._parse_tsv(raw_text)
 
-        # Agregar fecha de rating
+        # Agregar fecha de rating. Sin fecha explícita usamos SNAPSHOT_DATE
+        # (temprana) para que el Elo actual aplique como proxy estático a todos
+        # los partidos históricos vía la vista (rating_date <= match_date).
         rating_date = (
             datetime.strptime(date, "%Y-%m-%d").date()
             if date
-            else datetime.now().date()
+            else self.SNAPSHOT_DATE
         )
         df["rating_date"] = rating_date
 

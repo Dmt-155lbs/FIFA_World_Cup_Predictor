@@ -88,13 +88,13 @@ else:
         },
     )
     st.caption(
-        "⚠️ **Fiabilidad** = `Baja` cuando una de las selecciones tiene poco o "
-        "ningún historial internacional en el dataset (12 de los 48: Curazao, "
-        "Cabo Verde, Jordania, RD Congo…). Para esos equipos el modelo recae en "
-        "un prior de *equipo promedio*, lo que **infla** su probabilidad y el EV "
-        "(de ahí EVs de +100%/+600% que NO son ventajas reales). Confía en las "
-        "filas de fiabilidad `Alta`. El EV positivo es esperanza matemática "
-        "sobre la cuota, no una garantía; las apuestas conllevan riesgo."
+        "⚠️ **Fiabilidad** = `Baja` cuando (1) algún equipo carece de historial "
+        "—ya resuelto: los 48 lo tienen tras cargar los 12 que faltaban— o (2) el "
+        "EV es implausible (>35%, techo de un mercado líquido) o la `Prob. Modelo` "
+        "dispara respecto a la `Prob. Casa` (≥2× y ≥10 pp): ahí el modelo Poisson "
+        "**sobre-estima al underdog** (sesgo estructural, no de datos) y el EV no "
+        "es ventaja real. Confía en las filas `Alta` (se muestran primero). El EV "
+        "positivo es esperanza matemática sobre la cuota, no una garantía."
     )
 
 st.divider()

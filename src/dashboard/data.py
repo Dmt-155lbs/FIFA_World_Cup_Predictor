@@ -292,11 +292,13 @@ def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
     probabilidad implícita del mercado sin el margen (de-vig) para comparar de
     forma justa contra la del modelo.
 
-    Cada fila incluye una columna ``Fiabilidad``: es ``Baja`` cuando alguno de
-    los dos equipos no tiene historial internacional en el feature store y el
-    modelo recae en un prior de "equipo promedio" (lo que infla la probabilidad
-    de las selecciones pequeñas y, por tanto, su EV). Las apuestas de alta
-    fiabilidad se muestran primero.
+    Cada fila incluye una columna ``Fiabilidad`` (``Alta``/``Baja``) con dos
+    guardias: (1) alguno de los equipos no tiene historial real (tras cargar los
+    12 antes ciegos esto ya no ocurre en el Mundial); (2) el EV es implausible
+    (> 35%, techo de un mercado líquido) o la prob del modelo dispara respecto a
+    la del mercado (≥2× y ≥10 pp), señal de que el modelo Poisson sobre-estima al
+    underdog en vez de una ventaja real. Las apuestas de alta fiabilidad se
+    muestran primero.
 
     Retorna un DataFrame (posiblemente vacío) con columnas:
     ``Fecha, Partido, Pick, Cuota, Prob. Modelo, Prob. Casa, EV, Fiabilidad``,
@@ -373,16 +375,36 @@ def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
             fx["match_date"].strftime("%d %b")
             if pd.notna(fx["match_date"]) else "—"
         )
-        # Fiabilidad: baja si algún equipo carece de historial real.
-        reliable = (
-            (not known_teams)  # builder no disponible → no penalizar
+        # Guardia 1: ambos equipos deben tener historial real (tras cargar los
+        # 12 antes ciegos, esto ya se cumple para todo el Mundial; se mantiene
+        # como red de seguridad).
+        has_history = (
+            (not known_teams)
             or (fx["home_team"] in known_teams and fx["away_team"] in known_teams)
         )
-        fiabilidad = "Alta" if reliable else "Baja ⚠️"
 
         for outcome in ("home", "draw", "away"):
             ev = model_probs[outcome] * odds[outcome] - 1.0
             if ev > ev_threshold:
+                # Guardia 2: optimismo del modelo. El modelo Poisson sub-dispersa
+                # los duelos desparejos (sub-rate al favorito, sobre-rate empate y
+                # underdog); fix de datos (Elo + 12 equipos) NO lo corrige porque
+                # es estructural. Un mercado líquido del Mundial casi nunca deja
+                # ventajas > ~35%, así que un EV altísimo es casi siempre error de
+                # calibración, no valor real. Marcamos baja confianza si el EV
+                # supera ese techo O si la prob del modelo dispara respecto a la
+                # del mercado (≥2× y ≥10 pp). Así el dashboard sólo destaca como
+                # `Alta` las ventajas pequeñas y creíbles (Brazil/Belgium ~+8-10%).
+                mkt = market_probs[outcome]
+                blowout = (
+                    ev > 0.35
+                    or (
+                        mkt > 0
+                        and model_probs[outcome] >= 2.0 * mkt
+                        and (model_probs[outcome] - mkt) >= 0.10
+                    )
+                )
+                reliable = has_history and not blowout
                 pick = fx["home_team"] if outcome == "home" else (
                     fx["away_team"] if outcome == "away" else "Empate"
                 )
@@ -394,7 +416,7 @@ def get_value_bets(ev_threshold: float = 0.05) -> pd.DataFrame:
                     "Prob. Modelo": f"{model_probs[outcome]:.1%}",
                     "Prob. Casa": f"{market_probs[outcome]:.1%}",
                     "EV": f"+{ev:.1%}",
-                    "Fiabilidad": fiabilidad,
+                    "Fiabilidad": "Alta" if reliable else "Baja ⚠️",
                     "_ev": ev,
                     "_reliable": reliable,
                 })

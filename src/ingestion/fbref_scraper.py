@@ -53,6 +53,17 @@ class FBrefScraper(BaseScraper):
 
     # Normalización de nombres del dataset → nombre canónico en DIM_TEAM.
     # Red de seguridad: la mayoría ya coincide, pero cubrimos variantes.
+    #
+    # NOTA (calibración de los 12 equipos "ciegos"): tras verificar el CSV
+    # crudo de martj42, de los 12 clasificados sin historial sólo CURAÇAO tenía
+    # un nombre distinto (cedilla) al canónico "Curacao"; los otros 11
+    # (Ghana, Norway, Sweden, Scotland, Tunisia, Haiti, Jordan, DR Congo,
+    # Cape Verde, Czech Republic, Bosnia and Herzegovina) se escriben EXACTO
+    # igual en el CSV — estaban ciegos porque se añadieron a DIM_TEAM DESPUÉS
+    # de la ingesta original de partidos, no por un problema de nombre. Re-correr
+    # `ingest --source fbref` carga por fin su historial. Las entradas extra de
+    # abajo (Czechia, Cabo Verde, Congo DR…) son redes de seguridad por si el
+    # dataset cambia la grafía en el futuro.
     _TEAM_NORM = {
         "Türkiye": "Turkey",
         "Korea Republic": "South Korea",
@@ -61,6 +72,13 @@ class FBrefScraper(BaseScraper):
         "Côte d'Ivoire": "Ivory Coast",
         "Cape Verde Islands": "Cape Verde",
         "China PR": "China",
+        # ── Fix real + redes de seguridad para los 12 clasificados ──────────
+        "Curaçao": "Curacao",          # cedilla en el CSV → canónico sin cedilla
+        "Cabo Verde": "Cape Verde",
+        "Czechia": "Czech Republic",
+        "Congo DR": "DR Congo",
+        "Bosnia-Herzegovina": "Bosnia and Herzegovina",
+        "Bosnia Herzegovina": "Bosnia and Herzegovina",
     }
 
     def __init__(self) -> None:
